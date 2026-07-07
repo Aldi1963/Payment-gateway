@@ -11,6 +11,7 @@ $adminMenus = [
     ['url' => '/admin/users.php', 'icon' => 'users', 'label' => 'Users', 'page' => 'users'],
     ['url' => '/admin/merchants.php', 'icon' => 'store', 'label' => 'Merchants', 'page' => 'merchants'],
     ['url' => '/admin/transactions.php', 'icon' => 'receipt', 'label' => 'Transaksi', 'page' => 'transactions'],
+    ['url' => '/admin/fee-management.php', 'icon' => 'fee', 'label' => 'Fee Engine', 'page' => 'fee-management'],
     ['url' => '/admin/config-changes.php', 'icon' => 'shield', 'label' => 'Config Verify', 'page' => 'config-changes'],
     ['url' => '/admin/withdrawals.php', 'icon' => 'wallet', 'label' => 'Withdrawals', 'page' => 'withdrawals'],
     ['url' => '/admin/settlements.php', 'icon' => 'bank', 'label' => 'Settlements', 'page' => 'settlements'],

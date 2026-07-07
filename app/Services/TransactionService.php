@@ -70,8 +70,9 @@ class TransactionService
             return ['success' => false, 'message' => 'Format nomor WhatsApp tidak valid.'];
         }
 
-        // Calculate fee
-        $fee = $this->feeService->calculate($amount, $merchant);
+        // Calculate fee using Fee Engine
+        $feeResult = $this->feeService->calculateTransaction($amount, $merchantId);
+        $fee = $feeResult['fee'];
         $netAmount = $amount - $fee;
 
         // Build webhook URL
@@ -94,6 +95,9 @@ class TransactionService
             'order_id' => $orderId,
             'amount' => $amount,
             'fee' => $fee,
+            'fee_type' => $feeResult['fee_type'],
+            'fee_rule_id' => $feeResult['rule_id'],
+            'fee_snapshot' => $feeResult['snapshot'],
             'net_amount' => $netAmount,
             'status' => 'PENDING',
             'link_name' => $data['link_name'] ?? "Tagihan {$orderId}",

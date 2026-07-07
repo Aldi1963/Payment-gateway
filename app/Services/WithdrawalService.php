@@ -52,10 +52,22 @@ class WithdrawalService
         }
 
         $withdrawalId = generate_uuid();
+
+        // Calculate withdrawal fee using Fee Engine
+        require_once base_path('app/Services/FeeService.php');
+        $feeEngine = new FeeService();
+        $wdFeeResult = $feeEngine->calculateWithdrawal($amount, $merchantId);
+        $withdrawalFee = $wdFeeResult['fee'];
+        $netWithdrawal = $amount - $withdrawalFee;
+
         $withdrawal = [
             'id' => $withdrawalId,
             'merchant_id' => $merchantId,
             'amount' => $amount,
+            'fee' => $withdrawalFee,
+            'net_amount' => $netWithdrawal,
+            'fee_type' => $wdFeeResult['fee_type'],
+            'fee_snapshot' => $wdFeeResult['snapshot'],
             'bank_name' => sanitize($data['bank_name']),
             'account_number' => sanitize($data['account_number']),
             'account_name' => sanitize($data['account_name']),
