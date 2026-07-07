@@ -1,8 +1,11 @@
-# Storage data files (contain sensitive data)
-storage/*.json
+# Storage backup files (generated at runtime)
 storage/*.backup
+
+# Log files (generated at runtime)
 storage/logs.txt
-!storage/.gitkeep
+
+# Notifications (generated at runtime)
+storage/notifications.json
 
 # Environment
 .env
@@ -20,3 +23,6 @@ Thumbs.db
 # Temp
 *.tmp
 *.bak
+
+# Install script (should be deleted after installation)
+# install.php
