@@ -15,9 +15,9 @@ class FeeService
      */
     public function calculate(int|float $amount, array $merchant): int|float
     {
-        $feeType = $merchant['fee_type'] ?? config('app.default_fee_type', 'percentage');
-        $feeValue = $merchant['fee_value'] ?? config('app.default_fee_value', 0.7);
-        $feeFlat = $merchant['fee_flat'] ?? config('app.default_fee_flat', 0);
+        $feeType = $merchant['fee_type'] ?? setting('default_fee_type', config('app.default_fee_type', 'percentage'));
+        $feeValue = $merchant['fee_value'] ?? setting('default_fee_value', config('app.default_fee_value', 0.7));
+        $feeFlat = $merchant['fee_flat'] ?? setting('default_fee_flat', config('app.default_fee_flat', 0));
 
         return match($feeType) {
             'flat' => $this->calculateFlat($feeValue),

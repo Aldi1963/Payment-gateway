@@ -91,6 +91,7 @@ class Auth
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['merchant_id'] = $user['merchant_id'] ?? null;
+        $_SESSION['permissions'] = $user['permissions'] ?? [];
         $_SESSION['logged_in_at'] = time();
         
         // Update last login

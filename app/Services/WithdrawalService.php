@@ -32,10 +32,15 @@ class WithdrawalService
         }
 
         $amount = (int)($data['amount'] ?? 0);
-        $minWithdrawal = config('app.min_withdrawal', 10000);
+        $minWithdrawal = (int)setting('min_withdrawal', config('app.min_withdrawal', 10000));
+        $maxWithdrawal = (int)setting('max_withdrawal', 100000000);
 
         if ($amount < $minWithdrawal) {
             return ['success' => false, 'message' => 'Minimal penarikan ' . format_currency($minWithdrawal)];
+        }
+
+        if ($maxWithdrawal > 0 && $amount > $maxWithdrawal) {
+            return ['success' => false, 'message' => 'Maksimal penarikan ' . format_currency($maxWithdrawal)];
         }
 
         if ($amount > $wallet['available_balance']) {

@@ -8,6 +8,7 @@ $userRole = $_SESSION['user_role'] ?? 'admin';
 
 $adminMenus = [
     ['url' => '/admin/dashboard.php', 'icon' => 'dashboard', 'label' => 'Dashboard', 'page' => 'dashboard'],
+    ['url' => '/admin/users.php', 'icon' => 'users', 'label' => 'Users', 'page' => 'users'],
     ['url' => '/admin/merchants.php', 'icon' => 'store', 'label' => 'Merchants', 'page' => 'merchants'],
     ['url' => '/admin/transactions.php', 'icon' => 'receipt', 'label' => 'Transaksi', 'page' => 'transactions'],
     ['url' => '/admin/withdrawals.php', 'icon' => 'wallet', 'label' => 'Withdrawals', 'page' => 'withdrawals'],

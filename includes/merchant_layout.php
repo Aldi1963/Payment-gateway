@@ -14,10 +14,34 @@ $merchantMenus = [
     ['url' => '/merchant/wallet.php', 'icon' => 'wallet', 'label' => 'Wallet', 'page' => 'wallet'],
     ['url' => '/merchant/withdraw.php', 'icon' => 'withdraw', 'label' => 'Tarik Dana', 'page' => 'withdraw'],
     ['url' => '/merchant/withdraw-history.php', 'icon' => 'history', 'label' => 'Riwayat Penarikan', 'page' => 'withdraw-history'],
+    ['url' => '/merchant/staff.php', 'icon' => 'staff', 'label' => 'Staff', 'page' => 'staff'],
     ['url' => '/merchant/api-keys.php', 'icon' => 'key', 'label' => 'API Keys', 'page' => 'api-keys'],
     ['url' => '/merchant/webhook-settings.php', 'icon' => 'webhook', 'label' => 'Webhook', 'page' => 'webhook-settings'],
+    ['url' => '/merchant/settings.php', 'icon' => 'settings', 'label' => 'Pengaturan', 'page' => 'settings'],
     ['url' => '/merchant/profile.php', 'icon' => 'profile', 'label' => 'Profil', 'page' => 'profile'],
 ];
+
+// Staff merchant: filter menus based on permissions
+if ($userRole === 'staff_merchant') {
+    $staffPerms = $_SESSION['permissions'] ?? [];
+    $permMenuMap = [
+        'view_transactions' => ['transactions', 'payment-links'],
+        'create_payment' => ['create-payment'],
+        'view_wallet' => ['wallet'],
+        'view_withdrawals' => ['withdraw-history'],
+        'request_withdrawal' => ['withdraw'],
+        'manage_webhook' => ['webhook-settings'],
+        'view_api_keys' => ['api-keys'],
+        'view_payment_links' => ['payment-links'],
+    ];
+    $allowedPages = ['dashboard', 'profile']; // always allowed
+    foreach ($staffPerms as $perm) {
+        if (isset($permMenuMap[$perm])) {
+            $allowedPages = array_merge($allowedPages, $permMenuMap[$perm]);
+        }
+    }
+    $merchantMenus = array_filter($merchantMenus, fn($m) => in_array($m['page'], $allowedPages));
+}
 ?>
 
 <div class="flex h-screen overflow-hidden">

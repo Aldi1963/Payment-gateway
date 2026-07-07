@@ -7,73 +7,465 @@ require_once base_path('app/Services/AuditLogService.php');
 $settingRepo = new SettingRepository();
 $auditService = new AuditLogService();
 
+// Handle form submission
 if (is_post()) {
     Auth::verifyCsrf();
-    $settingRepo->set('default_fee_type', $_POST['default_fee_type'] ?? 'percentage');
-    $settingRepo->set('default_fee_value', (float)($_POST['default_fee_value'] ?? 0.7));
-    $settingRepo->set('default_fee_flat', (float)($_POST['default_fee_flat'] ?? 0));
-    $settingRepo->set('min_withdrawal', (int)($_POST['min_withdrawal'] ?? 10000));
-    $settingRepo->set('global_webhook_url', sanitize($_POST['global_webhook_url'] ?? ''));
-    $settingRepo->set('app_name', sanitize($_POST['app_name'] ?? 'PayGate Pro'));
+    $tab = $_POST['_tab'] ?? 'general';
+    
+    if ($tab === 'general') {
+        $settingRepo->set('app_name', sanitize($_POST['app_name'] ?? 'PayGate Pro'));
+        $settingRepo->set('app_url', sanitize($_POST['app_url'] ?? ''));
+        $settingRepo->set('app_description', sanitize($_POST['app_description'] ?? ''));
+        $settingRepo->set('app_logo_url', sanitize($_POST['app_logo_url'] ?? ''));
+        $settingRepo->set('timezone', sanitize($_POST['timezone'] ?? 'Asia/Jakarta'));
+        $settingRepo->set('per_page', (int)($_POST['per_page'] ?? 20));
+        $settingRepo->set('maintenance_mode', isset($_POST['maintenance_mode']) ? '1' : '0');
+    } elseif ($tab === 'gateway') {
+        $settingRepo->set('aldiqris_base_url', sanitize($_POST['aldiqris_base_url'] ?? ''));
+        $settingRepo->set('aldiqris_api_key', $_POST['aldiqris_api_key'] ?? '');
+        $settingRepo->set('aldiqris_timeout', (int)($_POST['aldiqris_timeout'] ?? 30));
+        $settingRepo->set('aldiqris_ssl_verify', isset($_POST['aldiqris_ssl_verify']) ? '1' : '0');
+        $settingRepo->set('aldiqris_endpoint', sanitize($_POST['aldiqris_endpoint'] ?? '/api/trx'));
+    } elseif ($tab === 'fees') {
+        $settingRepo->set('default_fee_type', $_POST['default_fee_type'] ?? 'percentage');
+        $settingRepo->set('default_fee_value', (float)($_POST['default_fee_value'] ?? 0.7));
+        $settingRepo->set('default_fee_flat', (float)($_POST['default_fee_flat'] ?? 0));
+        $settingRepo->set('min_transaction_amount', (int)($_POST['min_transaction_amount'] ?? 1000));
+        $settingRepo->set('max_transaction_amount', (int)($_POST['max_transaction_amount'] ?? 50000000));
+    } elseif ($tab === 'withdrawal') {
+        $settingRepo->set('min_withdrawal', (int)($_POST['min_withdrawal'] ?? 10000));
+        $settingRepo->set('max_withdrawal', (int)($_POST['max_withdrawal'] ?? 100000000));
+        $settingRepo->set('withdrawal_fee_type', $_POST['withdrawal_fee_type'] ?? 'flat');
+        $settingRepo->set('withdrawal_fee_value', (float)($_POST['withdrawal_fee_value'] ?? 0));
+        $settingRepo->set('auto_approve_withdrawal', isset($_POST['auto_approve_withdrawal']) ? '1' : '0');
+        $settingRepo->set('withdrawal_schedule', sanitize($_POST['withdrawal_schedule'] ?? 'manual'));
 
-    $auditService->log(Auth::id(), Auth::role(), null, 'settings_changed', 'Global settings updated', []);
+        // Save bank list
+        $banks = array_filter(array_map('trim', explode("\n", $_POST['bank_list'] ?? '')));
+        $settingRepo->set('bank_list', $banks);
+    } elseif ($tab === 'webhook') {
+        $settingRepo->set('global_webhook_url', sanitize($_POST['global_webhook_url'] ?? ''));
+        $settingRepo->set('webhook_signature_header', sanitize($_POST['webhook_signature_header'] ?? 'X-Signature'));
+        $settingRepo->set('webhook_hash_algo', sanitize($_POST['webhook_hash_algo'] ?? 'sha256'));
+        $settingRepo->set('webhook_max_payload_size', (int)($_POST['webhook_max_payload_size'] ?? 65536));
+        $settingRepo->set('webhook_retry_enabled', isset($_POST['webhook_retry_enabled']) ? '1' : '0');
+        $settingRepo->set('webhook_retry_count', (int)($_POST['webhook_retry_count'] ?? 3));
+    } elseif ($tab === 'settlement') {
+        $settingRepo->set('auto_settle', isset($_POST['auto_settle']) ? '1' : '0');
+        $settingRepo->set('settle_delay_hours', (int)($_POST['settle_delay_hours'] ?? 24));
+        $settingRepo->set('min_settlement_amount', (int)($_POST['min_settlement_amount'] ?? 50000));
+        $settingRepo->set('settlement_schedule', sanitize($_POST['settlement_schedule'] ?? 'manual'));
+    } elseif ($tab === 'security') {
+        $settingRepo->set('login_max_attempts', (int)($_POST['login_max_attempts'] ?? 5));
+        $settingRepo->set('login_lockout_time', (int)($_POST['login_lockout_time'] ?? 900));
+        $settingRepo->set('session_lifetime', (int)($_POST['session_lifetime'] ?? 7200));
+        $settingRepo->set('password_min_length', (int)($_POST['password_min_length'] ?? 8));
+        $settingRepo->set('force_https', isset($_POST['force_https']) ? '1' : '0');
+        $settingRepo->set('allowed_ips', sanitize($_POST['allowed_ips'] ?? ''));
+    } elseif ($tab === 'notifications') {
+        $settingRepo->set('notif_email_enabled', isset($_POST['notif_email_enabled']) ? '1' : '0');
+        $settingRepo->set('notif_email_from', sanitize($_POST['notif_email_from'] ?? ''));
+        $settingRepo->set('notif_wa_enabled', isset($_POST['notif_wa_enabled']) ? '1' : '0');
+        $settingRepo->set('notif_wa_api_url', sanitize($_POST['notif_wa_api_url'] ?? ''));
+        $settingRepo->set('notif_wa_api_key', $_POST['notif_wa_api_key'] ?? '');
+        $settingRepo->set('notif_on_payment', isset($_POST['notif_on_payment']) ? '1' : '0');
+        $settingRepo->set('notif_on_withdrawal', isset($_POST['notif_on_withdrawal']) ? '1' : '0');
+    }
+
+    $auditService->log(Auth::id(), Auth::role(), null, 'settings_changed', "Settings tab [{$tab}] updated", ['tab' => $tab]);
     flash('success', 'Pengaturan berhasil disimpan.');
-    redirect('/admin/settings.php');
+    redirect('/admin/settings.php?tab=' . $tab);
 }
 
-$settings = $settingRepo->getAllSettings();
+$s = $settingRepo->getAllSettings();
+$activeTab = $_GET['tab'] ?? 'general';
 $pageTitle = 'Settings';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
 
-<div class="max-w-2xl">
-    <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Global</h3>
-        
-        <form method="POST" class="space-y-5">
-            <?= csrf_field() ?>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Aplikasi</label>
-                <input type="text" name="app_name" value="<?= e($settings['app_name'] ?? 'PayGate Pro') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
+<!-- Tab Navigation -->
+<div class="border-b border-slate-200 mb-6">
+    <nav class="flex gap-1 -mb-px overflow-x-auto">
+        <?php
+        $tabs = [
+            'general' => 'Umum',
+            'gateway' => 'Gateway API',
+            'fees' => 'Fee & Transaksi',
+            'withdrawal' => 'Withdrawal',
+            'webhook' => 'Webhook',
+            'settlement' => 'Settlement',
+            'security' => 'Keamanan',
+            'notifications' => 'Notifikasi',
+        ];
+        foreach ($tabs as $tabKey => $tabLabel): ?>
+        <a href="?tab=<?= $tabKey ?>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors <?= $activeTab === $tabKey ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300' ?>">
+            <?= $tabLabel ?>
+        </a>
+        <?php endforeach; ?>
+    </nav>
+</div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Default Fee Type</label>
-                    <select name="default_fee_type" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
-                        <option value="percentage" <?= ($settings['default_fee_type'] ?? '') === 'percentage' ? 'selected' : '' ?>>Percentage</option>
-                        <option value="flat" <?= ($settings['default_fee_type'] ?? '') === 'flat' ? 'selected' : '' ?>>Flat</option>
-                        <option value="hybrid" <?= ($settings['default_fee_type'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Fee Value</label>
-                    <input type="number" name="default_fee_value" step="0.01" value="<?= e($settings['default_fee_value'] ?? 0.7) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Fee Flat (hybrid)</label>
-                    <input type="number" name="default_fee_flat" value="<?= e($settings['default_fee_flat'] ?? 0) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-                </div>
-            </div>
+<div class="max-w-3xl">
+<div class="bg-white rounded-xl border border-slate-200 p-6">
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Minimal Withdrawal</label>
-                <input type="number" name="min_withdrawal" value="<?= e($settings['min_withdrawal'] ?? 10000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Global Webhook URL</label>
-                <input type="url" name="global_webhook_url" value="<?= e($settings['global_webhook_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://...">
-                <p class="text-xs text-slate-400 mt-1">Fallback webhook jika merchant tidak set webhook sendiri.</p>
-            </div>
-
-            <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                Simpan Pengaturan
-            </button>
-        </form>
+<?php if ($activeTab === 'general'): ?>
+<!-- GENERAL SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Umum</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="general">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Nama Aplikasi</label>
+            <input type="text" name="app_name" value="<?= e($s['app_name'] ?? 'PayGate Pro') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">App URL</label>
+            <input type="url" name="app_url" value="<?= e($s['app_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://yourdomain.com">
+        </div>
     </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Deskripsi Aplikasi</label>
+        <textarea name="app_description" rows="2" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"><?= e($s['app_description'] ?? '') ?></textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Logo URL</label>
+            <input type="url" name="app_logo_url" value="<?= e($s['app_logo_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://...logo.png">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
+            <select name="timezone" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <?php foreach (['Asia/Jakarta','Asia/Makassar','Asia/Jayapura','UTC'] as $tz): ?>
+                <option value="<?= $tz ?>" <?= ($s['timezone'] ?? 'Asia/Jakarta') === $tz ? 'selected' : '' ?>><?= $tz ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Item Per Halaman</label>
+            <input type="number" name="per_page" value="<?= e($s['per_page'] ?? 20) ?>" min="5" max="100" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+        <div class="flex items-end">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="maintenance_mode" value="1" <?= ($s['maintenance_mode'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Mode Maintenance</span>
+            </label>
+        </div>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+<?php elseif ($activeTab === 'gateway'): ?>
+<!-- GATEWAY API SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-2">Konfigurasi Gateway API (AldiQRIS)</h3>
+<p class="text-sm text-slate-500 mb-6">Pengaturan koneksi ke AldiQRIS payment gateway.</p>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="gateway">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Base URL</label>
+        <input type="url" name="aldiqris_base_url" value="<?= e($s['aldiqris_base_url'] ?? 'https://aldiqris.pages.dev') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        <p class="text-xs text-slate-400 mt-1">Default: https://aldiqris.pages.dev</p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">API Key (Global/Default)</label>
+        <input type="password" name="aldiqris_api_key" value="<?= e($s['aldiqris_api_key'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="gopay_xxxx...">
+        <p class="text-xs text-slate-400 mt-1">Digunakan jika merchant belum set API key sendiri.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Endpoint Create Transaction</label>
+            <input type="text" name="aldiqris_endpoint" value="<?= e($s['aldiqris_endpoint'] ?? '/api/trx') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Timeout (detik)</label>
+            <input type="number" name="aldiqris_timeout" value="<?= e($s['aldiqris_timeout'] ?? 30) ?>" min="5" max="120" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="aldiqris_ssl_verify" value="1" <?= ($s['aldiqris_ssl_verify'] ?? '1') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+        <span class="text-sm text-slate-700">SSL Verification (aktifkan di production)</span>
+    </label>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+
+<?php elseif ($activeTab === 'fees'): ?>
+<!-- FEE & TRANSACTION SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-2">Pengaturan Fee & Transaksi</h3>
+<p class="text-sm text-slate-500 mb-6">Default fee untuk merchant baru dan limit transaksi global.</p>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="fees">
+    <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+        <p class="text-sm text-blue-800 font-medium">Default Fee (untuk merchant baru)</p>
+        <p class="text-xs text-blue-600">Fee per merchant bisa di-override dari halaman Merchants.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Tipe Fee</label>
+            <select name="default_fee_type" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <option value="percentage" <?= ($s['default_fee_type'] ?? 'percentage') === 'percentage' ? 'selected' : '' ?>>Percentage (%)</option>
+                <option value="flat" <?= ($s['default_fee_type'] ?? '') === 'flat' ? 'selected' : '' ?>>Flat (Rp)</option>
+                <option value="hybrid" <?= ($s['default_fee_type'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid (% + Rp)</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Fee Value</label>
+            <input type="number" name="default_fee_value" step="0.01" value="<?= e($s['default_fee_value'] ?? 0.7) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            <p class="text-xs text-slate-400 mt-1">% atau Rp tergantung tipe</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Flat Add-on (hybrid)</label>
+            <input type="number" name="default_fee_flat" value="<?= e($s['default_fee_flat'] ?? 0) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <div class="border-t border-slate-200 pt-4">
+        <p class="text-sm font-medium text-slate-700 mb-3">Limit Transaksi</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Minimum Transaksi (Rp)</label>
+                <input type="number" name="min_transaction_amount" value="<?= e($s['min_transaction_amount'] ?? 1000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Maksimum Transaksi (Rp)</label>
+                <input type="number" name="max_transaction_amount" value="<?= e($s['max_transaction_amount'] ?? 50000000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+<?php elseif ($activeTab === 'withdrawal'): ?>
+<!-- WITHDRAWAL SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Withdrawal</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="withdrawal">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Minimum Withdrawal (Rp)</label>
+            <input type="number" name="min_withdrawal" value="<?= e($s['min_withdrawal'] ?? 10000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Maksimum Withdrawal (Rp)</label>
+            <input type="number" name="max_withdrawal" value="<?= e($s['max_withdrawal'] ?? 100000000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Fee Withdrawal (tipe)</label>
+            <select name="withdrawal_fee_type" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <option value="none" <?= ($s['withdrawal_fee_type'] ?? 'none') === 'none' ? 'selected' : '' ?>>Tanpa Fee</option>
+                <option value="flat" <?= ($s['withdrawal_fee_type'] ?? '') === 'flat' ? 'selected' : '' ?>>Flat (Rp)</option>
+                <option value="percentage" <?= ($s['withdrawal_fee_type'] ?? '') === 'percentage' ? 'selected' : '' ?>>Percentage (%)</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Fee Value</label>
+            <input type="number" name="withdrawal_fee_value" step="0.01" value="<?= e($s['withdrawal_fee_value'] ?? 0) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Jadwal Pencairan</label>
+            <select name="withdrawal_schedule" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <option value="manual" <?= ($s['withdrawal_schedule'] ?? 'manual') === 'manual' ? 'selected' : '' ?>>Manual (Admin Approve)</option>
+                <option value="daily" <?= ($s['withdrawal_schedule'] ?? '') === 'daily' ? 'selected' : '' ?>>Harian</option>
+                <option value="weekly" <?= ($s['withdrawal_schedule'] ?? '') === 'weekly' ? 'selected' : '' ?>>Mingguan</option>
+            </select>
+        </div>
+        <div class="flex items-end">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="auto_approve_withdrawal" value="1" <?= ($s['auto_approve_withdrawal'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Auto-approve withdrawal</span>
+            </label>
+        </div>
+    </div>
+    <div class="border-t border-slate-200 pt-4">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Daftar Bank yang Tersedia</label>
+        <textarea name="bank_list" rows="6" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="Satu bank per baris"><?php
+$bankList = $s['bank_list'] ?? ['BCA','BNI','BRI','Mandiri','CIMB Niaga','BSI','Permata','DANA','OVO','GoPay','ShopeePay'];
+echo e(is_array($bankList) ? implode("\n", $bankList) : $bankList);
+?></textarea>
+        <p class="text-xs text-slate-400 mt-1">Satu bank per baris. Akan muncul di dropdown merchant saat withdraw.</p>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+
+<?php elseif ($activeTab === 'webhook'): ?>
+<!-- WEBHOOK SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Webhook</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="webhook">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Global Webhook URL (Fallback)</label>
+        <input type="url" name="global_webhook_url" value="<?= e($s['global_webhook_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://yourdomain.com/webhook.php">
+        <p class="text-xs text-slate-400 mt-1">Digunakan jika merchant tidak mengatur webhook sendiri.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Signature Header Name</label>
+            <input type="text" name="webhook_signature_header" value="<?= e($s['webhook_signature_header'] ?? 'X-Signature') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Hash Algorithm</label>
+            <select name="webhook_hash_algo" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <?php foreach (['sha256','sha512','sha1','md5'] as $algo): ?>
+                <option value="<?= $algo ?>" <?= ($s['webhook_hash_algo'] ?? 'sha256') === $algo ? 'selected' : '' ?>><?= strtoupper($algo) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Max Payload Size (bytes)</label>
+        <input type="number" name="webhook_max_payload_size" value="<?= e($s['webhook_max_payload_size'] ?? 65536) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="webhook_retry_enabled" value="1" <?= ($s['webhook_retry_enabled'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Enable Webhook Retry</span>
+        </label>
+        <div>
+            <label class="block text-xs text-slate-500 mb-1">Retry Count</label>
+            <input type="number" name="webhook_retry_count" value="<?= e($s['webhook_retry_count'] ?? 3) ?>" min="1" max="10" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+<?php elseif ($activeTab === 'settlement'): ?>
+<!-- SETTLEMENT SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Settlement</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="settlement">
+    <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="auto_settle" value="1" <?= ($s['auto_settle'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+        <span class="text-sm text-slate-700">Auto Settlement (proses otomatis setelah delay)</span>
+    </label>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Delay Settlement (jam)</label>
+            <input type="number" name="settle_delay_hours" value="<?= e($s['settle_delay_hours'] ?? 24) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            <p class="text-xs text-slate-400 mt-1">Berapa jam setelah PAID sebelum auto-settle</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Min Settlement Amount (Rp)</label>
+            <input type="number" name="min_settlement_amount" value="<?= e($s['min_settlement_amount'] ?? 50000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Jadwal Settlement</label>
+        <select name="settlement_schedule" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+            <option value="manual" <?= ($s['settlement_schedule'] ?? 'manual') === 'manual' ? 'selected' : '' ?>>Manual</option>
+            <option value="daily" <?= ($s['settlement_schedule'] ?? '') === 'daily' ? 'selected' : '' ?>>Harian</option>
+            <option value="weekly" <?= ($s['settlement_schedule'] ?? '') === 'weekly' ? 'selected' : '' ?>>Mingguan</option>
+            <option value="monthly" <?= ($s['settlement_schedule'] ?? '') === 'monthly' ? 'selected' : '' ?>>Bulanan</option>
+        </select>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+
+<?php elseif ($activeTab === 'security'): ?>
+<!-- SECURITY SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Keamanan</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="security">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Max Login Attempts</label>
+            <input type="number" name="login_max_attempts" value="<?= e($s['login_max_attempts'] ?? 5) ?>" min="3" max="20" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Lockout Time (detik)</label>
+            <input type="number" name="login_lockout_time" value="<?= e($s['login_lockout_time'] ?? 900) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            <p class="text-xs text-slate-400 mt-1">900 = 15 menit</p>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Session Lifetime (detik)</label>
+            <input type="number" name="session_lifetime" value="<?= e($s['session_lifetime'] ?? 7200) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            <p class="text-xs text-slate-400 mt-1">7200 = 2 jam</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Password Min Length</label>
+            <input type="number" name="password_min_length" value="<?= e($s['password_min_length'] ?? 8) ?>" min="6" max="32" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        </div>
+    </div>
+    <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="force_https" value="1" <?= ($s['force_https'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+        <span class="text-sm text-slate-700">Force HTTPS</span>
+    </label>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Allowed IPs (Admin Access)</label>
+        <textarea name="allowed_ips" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="Kosongkan = semua IP diizinkan. Satu IP per baris."><?= e($s['allowed_ips'] ?? '') ?></textarea>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+
+<?php elseif ($activeTab === 'notifications'): ?>
+<!-- NOTIFICATION SETTINGS -->
+<h3 class="text-lg font-semibold text-slate-800 mb-6">Pengaturan Notifikasi</h3>
+<form method="POST" class="space-y-5">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="notifications">
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+        <p class="text-sm font-medium text-slate-700 mb-3">Email Notification</p>
+        <label class="flex items-center gap-2 cursor-pointer mb-3">
+            <input type="checkbox" name="notif_email_enabled" value="1" <?= ($s['notif_email_enabled'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Aktifkan Email Notification</span>
+        </label>
+        <div>
+            <label class="block text-xs text-slate-500 mb-1">From Email</label>
+            <input type="email" name="notif_email_from" value="<?= e($s['notif_email_from'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="noreply@yourdomain.com">
+        </div>
+    </div>
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+        <p class="text-sm font-medium text-slate-700 mb-3">WhatsApp Notification</p>
+        <label class="flex items-center gap-2 cursor-pointer mb-3">
+            <input type="checkbox" name="notif_wa_enabled" value="1" <?= ($s['notif_wa_enabled'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Aktifkan WhatsApp Notification</span>
+        </label>
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">WA Gateway API URL</label>
+                <input type="url" name="notif_wa_api_url" value="<?= e($s['notif_wa_api_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://wa-api.example.com/send">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">WA API Key</label>
+                <input type="password" name="notif_wa_api_key" value="<?= e($s['notif_wa_api_key'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+        <p class="text-sm font-medium text-slate-700 mb-3">Trigger Notifikasi</p>
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="notif_on_payment" value="1" <?= ($s['notif_on_payment'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Saat pembayaran berhasil</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="notif_on_withdrawal" value="1" <?= ($s['notif_on_withdrawal'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                <span class="text-sm text-slate-700">Saat withdrawal request</span>
+            </label>
+        </div>
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+</form>
+<?php endif; ?>
+
+</div>
 </div>
 
 <?php require_once __DIR__ . '/../includes/admin_footer.php'; ?>

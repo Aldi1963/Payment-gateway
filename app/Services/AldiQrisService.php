@@ -13,10 +13,11 @@ class AldiQrisService
 
     public function __construct()
     {
-        $this->baseUrl = config('gateway.aldiqris.base_url');
-        $this->timeout = config('gateway.aldiqris.timeout', 30);
-        $this->sslVerify = config('gateway.aldiqris.ssl_verify', true);
-        $this->endpoint = config('gateway.aldiqris.endpoint_create', '/api/trx');
+        // Dynamic: DB settings override file config
+        $this->baseUrl = setting('aldiqris_base_url', config('gateway.aldiqris.base_url', 'https://aldiqris.pages.dev'));
+        $this->timeout = (int)setting('aldiqris_timeout', config('gateway.aldiqris.timeout', 30));
+        $this->sslVerify = setting('aldiqris_ssl_verify', '1') === '1';
+        $this->endpoint = setting('aldiqris_endpoint', config('gateway.aldiqris.endpoint_create', '/api/trx'));
     }
 
     /**

@@ -6,6 +6,7 @@ require_once base_path('app/Controllers/MerchantController.php');
 $controller = new MerchantController();
 $walletData = $controller->wallet();
 $wallet = $walletData['wallet'];
+$merchant = $controller->getMerchant();
 
 if (is_post()) {
     Auth::verifyCsrf();
@@ -38,28 +39,27 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                 <label class="block text-sm font-medium text-slate-700 mb-1">Nama Bank <span class="text-red-500">*</span></label>
                 <select name="bank_name" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
                     <option value="">Pilih Bank</option>
-                    <option value="BCA">BCA</option>
-                    <option value="BNI">BNI</option>
-                    <option value="BRI">BRI</option>
-                    <option value="Mandiri">Mandiri</option>
-                    <option value="CIMB">CIMB Niaga</option>
-                    <option value="BSI">BSI</option>
-                    <option value="Permata">Permata</option>
-                    <option value="DANA">DANA</option>
-                    <option value="OVO">OVO</option>
-                    <option value="GoPay">GoPay</option>
-                    <option value="ShopeePay">ShopeePay</option>
+                    <?php
+                    require_once base_path('app/Repositories/SettingRepository.php');
+                    $sr = new SettingRepository();
+                    $banks = $sr->get('bank_list', ['BCA','BNI','BRI','Mandiri','CIMB Niaga','BSI','Permata','DANA','OVO','GoPay','ShopeePay']);
+                    if (!is_array($banks)) $banks = array_filter(array_map('trim', explode("\n", $banks)));
+                    // Pre-fill from merchant's saved bank
+                    $merchantBank = $merchant['bank_name'] ?? '';
+                    foreach ($banks as $bank): $bank = trim($bank); if (empty($bank)) continue; ?>
+                    <option value="<?= e($bank) ?>" <?= $merchantBank === $bank ? 'selected' : '' ?>><?= e($bank) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Rekening <span class="text-red-500">*</span></label>
-                <input type="text" name="account_number" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="1234567890">
+                <input type="text" name="account_number" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="1234567890" value="<?= e($merchant['bank_account_number'] ?? '') ?>">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Nama Pemilik Rekening <span class="text-red-500">*</span></label>
-                <input type="text" name="account_name" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Sesuai buku tabungan">
+                <input type="text" name="account_name" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Sesuai buku tabungan" value="<?= e($merchant['bank_account_name'] ?? '') ?>">
             </div>
 
             <div>

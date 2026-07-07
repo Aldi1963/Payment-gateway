@@ -85,7 +85,8 @@ require_once __DIR__ . '/../includes/admin_layout.php';
                     </td>
                     <td class="px-6 py-3 text-slate-500 text-xs"><?= format_date($m['created_at'], 'd/m/Y') ?></td>
                     <td class="px-6 py-3">
-                        <button onclick="openMerchantModal('<?= e($m['id']) ?>', '<?= e($m['business_name']) ?>', '<?= e($m['status']) ?>', '<?= e($m['fee_type']) ?>', '<?= e($m['fee_value']) ?>', '<?= e($m['fee_flat'] ?? 0) ?>')" class="text-blue-600 hover:text-blue-700 text-xs font-medium">Kelola</button>
+                        <a href="/admin/merchant-detail.php?id=<?= e($m['id']) ?>" class="text-blue-600 hover:text-blue-700 text-xs font-medium mr-2">Detail</a>
+                        <button onclick="openMerchantModal('<?= e($m['id']) ?>', '<?= e($m['business_name']) ?>', '<?= e($m['status']) ?>', '<?= e($m['fee_type']) ?>', '<?= e($m['fee_value']) ?>', '<?= e($m['fee_flat'] ?? 0) ?>')" class="text-slate-500 hover:text-slate-700 text-xs font-medium">Quick Edit</button>
                     </td>
                 </tr>
                 <?php endforeach; ?>

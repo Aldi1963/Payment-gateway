@@ -5,13 +5,36 @@
  */
 
 /**
- * Get application config
+ * Get application config - merges file config with dynamic DB settings
+ * DB settings override file config for keys that exist in both
  */
 function config(string $key, mixed $default = null): mixed
 {
     static $configs = [];
+    static $dbSettings = null;
     
+    // Load DB settings once (lazy)
+    if ($dbSettings === null) {
+        $dbSettings = load_db_settings();
+    }
+    
+    // Check if this key has a DB override (flat key like 'app_name', 'aldiqris_base_url')
+    $flatKey = str_replace('.', '_', $key);
+    if (isset($dbSettings[$flatKey])) {
+        return $dbSettings[$flatKey];
+    }
+    
+    // Also check the raw key without prefix (e.g. 'gateway.aldiqris.base_url' -> 'aldiqris_base_url')
     $parts = explode('.', $key);
+    if (count($parts) >= 2) {
+        // Try removing first segment: 'gateway.aldiqris.base_url' -> 'aldiqris_base_url'
+        $dbKey = implode('_', array_slice($parts, 1));
+        if (isset($dbSettings[$dbKey])) {
+            return $dbSettings[$dbKey];
+        }
+    }
+    
+    // Fallback to file-based config
     $file = $parts[0];
     
     if (!isset($configs[$file])) {
@@ -35,6 +58,36 @@ function config(string $key, mixed $default = null): mixed
     }
     
     return $value;
+}
+
+/**
+ * Load all dynamic settings from database (JSON storage)
+ */
+function load_db_settings(): array
+{
+    $file = dirname(__DIR__) . '/storage/settings.json';
+    if (!file_exists($file)) return [];
+    $content = file_get_contents($file);
+    $records = json_decode($content, true) ?: [];
+    $settings = [];
+    foreach ($records as $record) {
+        if (isset($record['key'])) {
+            $settings[$record['key']] = $record['value'] ?? null;
+        }
+    }
+    return $settings;
+}
+
+/**
+ * Get a dynamic setting with fallback to file config
+ */
+function setting(string $key, mixed $default = null): mixed
+{
+    static $settings = null;
+    if ($settings === null) {
+        $settings = load_db_settings();
+    }
+    return $settings[$key] ?? $default;
 }
 
 /**
