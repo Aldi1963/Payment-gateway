@@ -34,7 +34,8 @@ $files = [
     'users.json', 'merchants.json', 'transactions.json',
     'wallets.json', 'withdrawals.json', 'settlements.json',
     'webhook_events.json', 'audit_logs.json', 'settings.json',
-    'wallet_ledger.json', 'notifications.json',
+    'wallet_ledger.json', 'notifications.json', 'config_changes.json',
+    'fee_rules.json', 'webhook_retries.json', 'refunds.json',
 ];
 
 foreach ($files as $file) {

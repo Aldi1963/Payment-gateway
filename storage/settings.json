@@ -1,58 +1,37 @@
 [
     {
-        "id": "e964e464-2c39-44b5-b1ee-61f7595fe68e",
+        "id": "44e53b5f-f61c-49a3-8b00-6ef90ab4f7ee",
         "key": "app_name",
         "value": "PayGate Pro",
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     },
     {
-        "id": "c893a4ed-4eec-42bf-bf78-8bad826fbcc8",
+        "id": "eb96424c-4699-40e7-a164-65f08daed0fb",
         "key": "default_fee_type",
         "value": "percentage",
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     },
     {
-        "id": "86cd8756-1599-4c5f-b3d8-1a811559d773",
+        "id": "f1c5d78d-63db-481b-b842-455009f5958e",
         "key": "default_fee_value",
         "value": 0.7,
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     },
     {
-        "id": "3acdbe39-20b8-47e9-85d0-588518474f04",
+        "id": "101d6321-7db3-4bbe-bcfe-f44cdeb9f971",
         "key": "default_fee_flat",
         "value": 0,
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     },
     {
-        "id": "a7e712af-c823-435d-93d8-f304dd17b7d9",
+        "id": "97f7c1c4-79df-43bd-ab27-cad81686b7c2",
         "key": "min_withdrawal",
         "value": 10000,
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
-    },
-    {
-        "id": "6e32a7f1-b943-476f-974e-0deae1494a11",
-        "key": "global_webhook_url",
-        "value": "",
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
-    },
-    {
-        "id": "9032177f-2520-4091-98da-ded364af122e",
-        "key": "test_key_abc",
-        "value": "test_value_123",
-        "created_at": "2026-07-07 11:56:11",
-        "updated_at": "2026-07-07 11:56:11"
-    },
-    {
-        "id": "09662a3b-82a2-4f4e-8b6b-34c055a8fb4b",
-        "key": "aldiqris_timeout",
-        "value": 45,
-        "created_at": "2026-07-07 11:56:11",
-        "updated_at": "2026-07-07 11:56:11"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     }
 ]

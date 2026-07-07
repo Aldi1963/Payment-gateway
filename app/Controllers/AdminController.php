@@ -42,7 +42,10 @@ class AdminController
     {
         $stats = $this->transactionService->getAdminStats();
         $merchantCounts = $this->merchantRepo->countByStatus();
-        $recentTransactions = (new \TransactionRepository())->getRecent(10);
+        
+        require_once base_path('app/Repositories/TransactionRepository.php');
+        $txRepo = new TransactionRepository();
+        $recentTransactions = $txRepo->getRecent(10);
         $pendingWithdrawals = $this->withdrawalService->getAll(['status' => 'PENDING']);
 
         return [

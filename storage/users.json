@@ -1,13 +1,13 @@
 [
     {
-        "id": "usr-a584cb3e7452cb2e576a6606",
+        "id": "6f246646-7589-4cb1-ad9b-256a343c5efe",
         "merchant_id": null,
         "name": "Super Admin",
         "email": "admin@paygate.local",
-        "password_hash": "$2y$12$r3YdAmiZaPArQc6R.07VoOpLpZ7SFKHkq\/3UIzp7ALyMNRIirds4i",
+        "password_hash": "$2y$12$1OqLgBrZuTvqds5ziLHxZ.MJx8xKbcbO2EZKgGHWfNSkG683yAChS",
         "role": "super_admin",
         "status": "active",
-        "created_at": "2026-07-07 04:04:47",
-        "updated_at": "2026-07-07 04:04:47"
+        "created_at": "2026-07-07 07:10:32",
+        "updated_at": "2026-07-07 07:10:32"
     }
 ]
