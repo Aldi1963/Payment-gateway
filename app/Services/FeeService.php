@@ -13,13 +13,13 @@ class FeeService
      * @param array $merchant Merchant data with fee settings
      * @return int|float Calculated fee amount
      */
-    public function calculate(int|float $amount, array $merchant): int|float
+    public function calculate(int|float $amount, array $merchant): int
     {
         $feeType = $merchant['fee_type'] ?? setting('default_fee_type', config('app.default_fee_type', 'percentage'));
-        $feeValue = $merchant['fee_value'] ?? setting('default_fee_value', config('app.default_fee_value', 0.7));
-        $feeFlat = $merchant['fee_flat'] ?? setting('default_fee_flat', config('app.default_fee_flat', 0));
+        $feeValue = (float)($merchant['fee_value'] ?? setting('default_fee_value', config('app.default_fee_value', 0.7)));
+        $feeFlat = (float)($merchant['fee_flat'] ?? setting('default_fee_flat', config('app.default_fee_flat', 0)));
 
-        return match($feeType) {
+        return (int)match($feeType) {
             'flat' => $this->calculateFlat($feeValue),
             'percentage' => $this->calculatePercentage($amount, $feeValue),
             'hybrid' => $this->calculateHybrid($amount, $feeValue, $feeFlat),

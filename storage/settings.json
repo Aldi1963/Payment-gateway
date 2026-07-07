@@ -40,5 +40,19 @@
         "value": "",
         "created_at": "2026-07-07 04:04:47",
         "updated_at": "2026-07-07 04:04:47"
+    },
+    {
+        "id": "9032177f-2520-4091-98da-ded364af122e",
+        "key": "test_key_abc",
+        "value": "test_value_123",
+        "created_at": "2026-07-07 11:56:11",
+        "updated_at": "2026-07-07 11:56:11"
+    },
+    {
+        "id": "09662a3b-82a2-4f4e-8b6b-34c055a8fb4b",
+        "key": "aldiqris_timeout",
+        "value": 45,
+        "created_at": "2026-07-07 11:56:11",
+        "updated_at": "2026-07-07 11:56:11"
     }
 ]

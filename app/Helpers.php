@@ -447,7 +447,7 @@ function dd(mixed ...$vars): never
 function paginate(array $items, int $page = 1, int $perPage = 20): array
 {
     $total = count($items);
-    $totalPages = max(1, ceil($total / $perPage));
+    $totalPages = (int)max(1, ceil($total / $perPage));
     $page = max(1, min($page, $totalPages));
     $offset = ($page - 1) * $perPage;
     
