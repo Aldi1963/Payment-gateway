@@ -4,6 +4,8 @@
  * Payment Gateway SaaS Multi Merchant
  */
 
+require_once dirname(__DIR__) . '/app/Database.php';
+
 /**
  * Get application config - merges file config with dynamic DB settings
  * DB settings override file config for keys that exist in both
@@ -61,21 +63,21 @@ function config(string $key, mixed $default = null): mixed
 }
 
 /**
- * Load all dynamic settings from database (JSON storage)
+ * Load all dynamic settings from database (MySQL)
  */
 function load_db_settings(): array
 {
-    $file = dirname(__DIR__) . '/storage/settings.json';
-    if (!file_exists($file)) return [];
-    $content = file_get_contents($file);
-    $records = json_decode($content, true) ?: [];
-    $settings = [];
-    foreach ($records as $record) {
-        if (isset($record['key'])) {
-            $settings[$record['key']] = $record['value'] ?? null;
+    try {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->query("SELECT `key`, `value` FROM settings");
+        $settings = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $settings[$row['key']] = $row['value'];
         }
+        return $settings;
+    } catch (\Throwable $e) {
+        return [];
     }
-    return $settings;
 }
 
 /**

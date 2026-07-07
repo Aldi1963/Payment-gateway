@@ -7,9 +7,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class WithdrawalRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['fee_snapshot'];
+
     public function __construct()
     {
-        parent::__construct('withdrawals.json');
+        parent::__construct('withdrawals');
     }
 
     /**
@@ -17,10 +19,10 @@ class WithdrawalRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) => ($r['merchant_id'] ?? '') === $merchantId));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC",
+            ['mid' => $merchantId]
+        );
     }
 
     /**
@@ -28,10 +30,10 @@ class WithdrawalRepository extends BaseRepository
      */
     public function findByStatus(string $status): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) => ($r['status'] ?? '') === $status));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `status` = :status ORDER BY `created_at` DESC",
+            ['status' => $status]
+        );
     }
 
     /**
@@ -39,6 +41,9 @@ class WithdrawalRepository extends BaseRepository
      */
     public function countPending(): int
     {
-        return count($this->findByStatus('PENDING'));
+        return (int)$this->fetchColumn(
+            "SELECT COUNT(*) FROM `{$this->table}` WHERE `status` = :status",
+            ['status' => 'PENDING']
+        );
     }
 }

@@ -7,9 +7,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class UserRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['permissions'];
+
     public function __construct()
     {
-        parent::__construct('users.json');
+        parent::__construct('users');
     }
 
     /**
@@ -17,13 +19,9 @@ class UserRepository extends BaseRepository
      */
     public function findByEmail(string $email): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (strtolower($record['email'] ?? '') === strtolower($email)) {
-                return $record;
-            }
-        }
-        return null;
+        return $this->fetchOne("SELECT * FROM `{$this->table}` WHERE `email` = :email LIMIT 1", [
+            'email' => $email
+        ]);
     }
 
     /**
@@ -31,8 +29,9 @@ class UserRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId): array
     {
-        $records = $this->readAll();
-        return array_values(array_filter($records, fn($r) => ($r['merchant_id'] ?? '') === $merchantId));
+        return $this->query("SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC", [
+            'mid' => $merchantId
+        ]);
     }
 
     /**
@@ -40,7 +39,16 @@ class UserRepository extends BaseRepository
      */
     public function findByRole(string $role): array
     {
-        $records = $this->readAll();
-        return array_values(array_filter($records, fn($r) => ($r['role'] ?? '') === $role));
+        return $this->query("SELECT * FROM `{$this->table}` WHERE `role` = :role ORDER BY `created_at` DESC", [
+            'role' => $role
+        ]);
+    }
+
+    /**
+     * Get searchable columns for LIKE search
+     */
+    protected function getSearchableColumns(): array
+    {
+        return ['name', 'email'];
     }
 }

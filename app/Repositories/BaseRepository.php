@@ -1,102 +1,21 @@
 <?php
 /**
  * Base Repository
- * JSON file storage with LOCK_EX, validation, backup, and error handling
+ * MySQL/PDO storage with prepared statements
  */
+
+require_once __DIR__ . '/../Database.php';
 
 class BaseRepository
 {
-    protected string $file;
-    protected string $storageDir;
+    protected string $table;
+    protected PDO $db;
+    protected array $jsonColumns = []; // columns that store JSON
 
-    public function __construct(string $filename)
+    public function __construct(string $table)
     {
-        $this->storageDir = dirname(__DIR__, 2) . '/storage';
-        $this->file = $this->storageDir . '/' . $filename;
-        $this->ensureFile();
-    }
-
-    /**
-     * Ensure storage file exists
-     */
-    protected function ensureFile(): void
-    {
-        if (!is_dir($this->storageDir)) {
-            mkdir($this->storageDir, 0755, true);
-        }
-        if (!file_exists($this->file)) {
-            file_put_contents($this->file, '[]', LOCK_EX);
-        }
-    }
-
-    /**
-     * Read all records from file
-     */
-    protected function readAll(): array
-    {
-        $content = file_get_contents($this->file);
-        
-        if ($content === false || trim($content) === '') {
-            return [];
-        }
-
-        $data = json_decode($content, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            // Try backup
-            $backupFile = $this->file . '.backup';
-            if (file_exists($backupFile)) {
-                $backupContent = file_get_contents($backupFile);
-                $data = json_decode($backupContent, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    // Restore from backup
-                    file_put_contents($this->file, $backupContent, LOCK_EX);
-                    app_log("Restored {$this->file} from backup", 'WARNING');
-                    return $data;
-                }
-            }
-            // If backup also fails, reset
-            app_log("JSON corrupt in {$this->file}, resetting", 'ERROR');
-            file_put_contents($this->file, '[]', LOCK_EX);
-            return [];
-        }
-
-        return $data;
-    }
-
-    /**
-     * Write all records to file with backup
-     */
-    protected function writeAll(array $data): bool
-    {
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        
-        if ($json === false) {
-            app_log("Failed to encode JSON for {$this->file}: " . json_last_error_msg(), 'ERROR');
-            return false;
-        }
-
-        // Validate JSON before writing
-        $testDecode = json_decode($json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            app_log("JSON validation failed for {$this->file}", 'ERROR');
-            return false;
-        }
-
-        // Create backup of current file
-        if (file_exists($this->file) && filesize($this->file) > 2) {
-            copy($this->file, $this->file . '.backup');
-        }
-
-        // Write with exclusive lock
-        $result = file_put_contents($this->file, $json, LOCK_EX);
-        
-        if ($result === false) {
-            app_log("Failed to write {$this->file}", 'ERROR');
-            return false;
-        }
-
-        return true;
+        $this->table = $table;
+        $this->db = Database::getConnection();
     }
 
     /**
@@ -104,13 +23,10 @@ class BaseRepository
      */
     public function find(string $id): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (($record['id'] ?? '') === $id) {
-                return $record;
-            }
-        }
-        return null;
+        $stmt = $this->db->prepare("SELECT * FROM `{$this->table}` WHERE `id` = :id LIMIT 1");
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        return $row ? $this->decodeJsonColumns($row) : null;
     }
 
     /**
@@ -118,9 +34,12 @@ class BaseRepository
      */
     public function create(array $record): bool
     {
-        $records = $this->readAll();
-        $records[] = $record;
-        return $this->writeAll($records);
+        $record = $this->encodeJsonColumns($record);
+        $columns = implode(', ', array_map(fn($k) => "`{$k}`", array_keys($record)));
+        $placeholders = implode(', ', array_map(fn($k) => ":{$k}", array_keys($record)));
+        $sql = "INSERT INTO `{$this->table}` ({$columns}) VALUES ({$placeholders})";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($record);
     }
 
     /**
@@ -128,19 +47,12 @@ class BaseRepository
      */
     public function update(string $id, array $data): bool
     {
-        $records = $this->readAll();
-        $found = false;
-        
-        foreach ($records as &$record) {
-            if (($record['id'] ?? '') === $id) {
-                $record = array_merge($record, $data);
-                $found = true;
-                break;
-            }
-        }
-        
-        if (!$found) return false;
-        return $this->writeAll($records);
+        $data = $this->encodeJsonColumns($data);
+        $sets = implode(', ', array_map(fn($k) => "`{$k}` = :{$k}", array_keys($data)));
+        $data['_id'] = $id;
+        $sql = "UPDATE `{$this->table}` SET {$sets} WHERE `id` = :_id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($data);
     }
 
     /**
@@ -148,48 +60,44 @@ class BaseRepository
      */
     public function delete(string $id): bool
     {
-        $records = $this->readAll();
-        $records = array_values(array_filter($records, fn($r) => ($r['id'] ?? '') !== $id));
-        return $this->writeAll($records);
+        $stmt = $this->db->prepare("DELETE FROM `{$this->table}` WHERE `id` = :id");
+        return $stmt->execute(['id' => $id]);
     }
 
     /**
-     * Get all records with optional sorting (newest first by default)
+     * Get all records with optional filters (newest first by default)
      */
     public function findAll(array $filters = []): array
     {
-        $records = $this->readAll();
-        
-        // Apply filters
-        if (!empty($filters)) {
-            $records = array_filter($records, function($record) use ($filters) {
-                foreach ($filters as $key => $value) {
-                    if ($key === 'search') continue;
-                    if (isset($record[$key]) && $record[$key] !== $value) {
-                        return false;
-                    }
-                }
-                return true;
-            });
+        $where = [];
+        $params = [];
+
+        foreach ($filters as $key => $value) {
+            if ($key === 'search') continue;
+            $where[] = "`{$key}` = :{$key}";
+            $params[$key] = $value;
         }
 
-        // Search filter
+        $sql = "SELECT * FROM `{$this->table}`";
+        if (!empty($where)) {
+            $sql .= " WHERE " . implode(' AND ', $where);
+        }
+
         if (!empty($filters['search'])) {
-            $search = strtolower($filters['search']);
-            $records = array_filter($records, function($record) use ($search) {
-                $searchable = strtolower(implode(' ', array_map(function($v) {
-                    return is_string($v) ? $v : '';
-                }, $record)));
-                return str_contains($searchable, $search);
-            });
+            $searchCols = $this->getSearchableColumns();
+            if (!empty($searchCols)) {
+                $searchWhere = array_map(fn($c) => "`{$c}` LIKE :_search", $searchCols);
+                $sql .= (empty($where) ? " WHERE " : " AND ") . "(" . implode(' OR ', $searchWhere) . ")";
+                $params['_search'] = '%' . $filters['search'] . '%';
+            }
         }
 
-        // Sort by created_at descending (newest first)
-        usort($records, function($a, $b) {
-            return strcmp($b['created_at'] ?? '', $a['created_at'] ?? '');
-        });
+        $sql .= " ORDER BY `created_at` DESC";
 
-        return array_values($records);
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+        return array_map(fn($r) => $this->decodeJsonColumns($r), $rows);
     }
 
     /**
@@ -198,5 +106,81 @@ class BaseRepository
     public function count(array $filters = []): int
     {
         return count($this->findAll($filters));
+    }
+
+    /**
+     * Get searchable columns for full-text-like LIKE search
+     * Override in child classes
+     */
+    protected function getSearchableColumns(): array
+    {
+        return [];
+    }
+
+    /**
+     * Encode JSON columns before insert/update
+     */
+    protected function encodeJsonColumns(array $data): array
+    {
+        foreach ($this->jsonColumns as $col) {
+            if (isset($data[$col]) && (is_array($data[$col]) || is_object($data[$col]))) {
+                $data[$col] = json_encode($data[$col], JSON_UNESCAPED_UNICODE);
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Decode JSON columns after fetch
+     */
+    protected function decodeJsonColumns(array $row): array
+    {
+        foreach ($this->jsonColumns as $col) {
+            if (isset($row[$col]) && is_string($row[$col])) {
+                $decoded = json_decode($row[$col], true);
+                $row[$col] = (json_last_error() === JSON_ERROR_NONE) ? $decoded : $row[$col];
+            }
+        }
+        return $row;
+    }
+
+    /**
+     * Execute raw query and return all rows
+     */
+    protected function query(string $sql, array $params = []): array
+    {
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return array_map(fn($r) => $this->decodeJsonColumns($r), $stmt->fetchAll());
+    }
+
+    /**
+     * Execute raw statement (INSERT/UPDATE/DELETE)
+     */
+    protected function execute(string $sql, array $params = []): bool
+    {
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    /**
+     * Fetch a single row from raw query
+     */
+    protected function fetchOne(string $sql, array $params = []): ?array
+    {
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
+        return $row ? $this->decodeJsonColumns($row) : null;
+    }
+
+    /**
+     * Fetch a single column value
+     */
+    protected function fetchColumn(string $sql, array $params = []): mixed
+    {
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
     }
 }

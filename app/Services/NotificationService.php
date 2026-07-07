@@ -1,22 +1,27 @@
 <?php
 /**
  * Notification Service
- * Handles sending notifications (placeholder for future implementation)
+ * Handles in-app notifications stored in MySQL
  */
+
+require_once base_path('app/Database.php');
 
 class NotificationService
 {
+    private PDO $db;
+
+    public function __construct()
+    {
+        $this->db = Database::getConnection();
+    }
+
     /**
      * Send notification to merchant
      */
     public function notifyMerchant(string $merchantId, string $type, string $message, array $data = []): bool
     {
-        // Log the notification attempt
         app_log("Notification [{$type}] to merchant {$merchantId}: {$message}", 'INFO');
-        
-        // Store in-app notification
         $this->storeNotification($merchantId, $type, $message, $data);
-        
         return true;
     }
 
@@ -31,34 +36,20 @@ class NotificationService
     }
 
     /**
-     * Store notification for in-app display
+     * Store notification
      */
     private function storeNotification(string $recipientId, string $type, string $message, array $data = []): void
     {
-        $notifications = $this->loadNotifications();
-        
-        $notifications[] = [
+        $stmt = $this->db->prepare("INSERT INTO `notifications` (`id`,`recipient_id`,`type`,`message`,`data`,`read`,`created_at`) VALUES (:id,:recipient_id,:type,:message,:data,:read,:created_at)");
+        $stmt->execute([
             'id' => generate_uuid(),
             'recipient_id' => $recipientId,
             'type' => $type,
             'message' => $message,
-            'data' => $data,
-            'read' => false,
+            'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
+            'read' => 0,
             'created_at' => now(),
-        ];
-
-        // Keep only last 100 notifications per recipient
-        $grouped = [];
-        foreach ($notifications as $n) {
-            $grouped[$n['recipient_id']][] = $n;
-        }
-        
-        $result = [];
-        foreach ($grouped as $recipientNotifs) {
-            $result = array_merge($result, array_slice($recipientNotifs, -100));
-        }
-
-        $this->saveNotifications($result);
+        ]);
     }
 
     /**
@@ -66,10 +57,15 @@ class NotificationService
      */
     public function getUnread(string $recipientId): array
     {
-        $notifications = $this->loadNotifications();
-        return array_values(array_filter($notifications, fn($n) => 
-            $n['recipient_id'] === $recipientId && !$n['read']
-        ));
+        $stmt = $this->db->prepare("SELECT * FROM `notifications` WHERE `recipient_id` = :rid AND `read` = 0 ORDER BY `created_at` DESC LIMIT 50");
+        $stmt->execute(['rid' => $recipientId]);
+        $rows = $stmt->fetchAll() ?: [];
+        return array_map(function($r) {
+            if (isset($r['data']) && is_string($r['data'])) {
+                $r['data'] = json_decode($r['data'], true) ?: [];
+            }
+            return $r;
+        }, $rows);
     }
 
     /**
@@ -77,27 +73,16 @@ class NotificationService
      */
     public function markRead(string $notificationId): void
     {
-        $notifications = $this->loadNotifications();
-        foreach ($notifications as &$n) {
-            if ($n['id'] === $notificationId) {
-                $n['read'] = true;
-                break;
-            }
-        }
-        $this->saveNotifications($notifications);
+        $stmt = $this->db->prepare("UPDATE `notifications` SET `read` = 1 WHERE `id` = :id");
+        $stmt->execute(['id' => $notificationId]);
     }
 
-    private function loadNotifications(): array
+    /**
+     * Mark all as read for a recipient
+     */
+    public function markAllRead(string $recipientId): void
     {
-        $file = storage_path('notifications.json');
-        if (!file_exists($file)) return [];
-        $content = file_get_contents($file);
-        return json_decode($content, true) ?: [];
-    }
-
-    private function saveNotifications(array $data): void
-    {
-        $file = storage_path('notifications.json');
-        file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX);
+        $stmt = $this->db->prepare("UPDATE `notifications` SET `read` = 1 WHERE `recipient_id` = :rid AND `read` = 0");
+        $stmt->execute(['rid' => $recipientId]);
     }
 }

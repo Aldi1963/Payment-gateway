@@ -7,9 +7,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class MerchantRepository extends BaseRepository
 {
+    protected array $jsonColumns = [];
+
     public function __construct()
     {
-        parent::__construct('merchants.json');
+        parent::__construct('merchants');
     }
 
     /**
@@ -18,13 +20,9 @@ class MerchantRepository extends BaseRepository
      */
     public function findByApiKey(string $apiKey): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (($record['api_key'] ?? '') === $apiKey) {
-                return $record;
-            }
-        }
-        return null;
+        return $this->fetchOne("SELECT * FROM `{$this->table}` WHERE `api_key` = :key LIMIT 1", [
+            'key' => $apiKey
+        ]);
     }
 
     /**
@@ -34,9 +32,9 @@ class MerchantRepository extends BaseRepository
      */
     public function findByApiKeySecure(string $apiKey): ?array
     {
-        $records = $this->readAll();
+        $records = $this->query("SELECT * FROM `{$this->table}`");
         $found = null;
-        
+
         // Always iterate ALL records (constant-time relative to dataset size)
         foreach ($records as $record) {
             $storedKey = $record['api_key'] ?? '';
@@ -45,22 +43,18 @@ class MerchantRepository extends BaseRepository
                 // Don't break - continue iterating to prevent timing leak
             }
         }
-        
+
         return $found;
     }
 
     /**
-     * Find merchant by email
+     * Find merchant by email (case insensitive)
      */
     public function findByEmail(string $email): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (strtolower($record['email'] ?? '') === strtolower($email)) {
-                return $record;
-            }
-        }
-        return null;
+        return $this->fetchOne("SELECT * FROM `{$this->table}` WHERE LOWER(`email`) = LOWER(:email) LIMIT 1", [
+            'email' => $email
+        ]);
     }
 
     /**
@@ -68,8 +62,9 @@ class MerchantRepository extends BaseRepository
      */
     public function findActive(): array
     {
-        $records = $this->readAll();
-        return array_values(array_filter($records, fn($r) => ($r['status'] ?? '') === 'active'));
+        return $this->query("SELECT * FROM `{$this->table}` WHERE `status` = :status ORDER BY `created_at` DESC", [
+            'status' => 'active'
+        ]);
     }
 
     /**
@@ -77,11 +72,16 @@ class MerchantRepository extends BaseRepository
      */
     public function countByStatus(): array
     {
-        $records = $this->readAll();
+        $stmt = $this->db->prepare("SELECT `status`, COUNT(*) as cnt FROM `{$this->table}` GROUP BY `status`");
+        $stmt->execute();
+        $rows = $stmt->fetchAll();
+
         $counts = ['pending' => 0, 'active' => 0, 'suspended' => 0, 'rejected' => 0];
-        foreach ($records as $r) {
-            $status = $r['status'] ?? 'pending';
-            if (isset($counts[$status])) $counts[$status]++;
+        foreach ($rows as $row) {
+            $status = $row['status'];
+            if (isset($counts[$status])) {
+                $counts[$status] = (int)$row['cnt'];
+            }
         }
         return $counts;
     }
@@ -94,5 +94,13 @@ class MerchantRepository extends BaseRepository
         $newKey = generate_api_key();
         $this->update($merchantId, ['api_key' => $newKey, 'updated_at' => now()]);
         return $newKey;
+    }
+
+    /**
+     * Get searchable columns for LIKE search
+     */
+    protected function getSearchableColumns(): array
+    {
+        return ['business_name', 'owner_name', 'email'];
     }
 }

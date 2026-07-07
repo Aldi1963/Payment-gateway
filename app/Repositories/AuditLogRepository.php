@@ -7,9 +7,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class AuditLogRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['metadata'];
+
     public function __construct()
     {
-        parent::__construct('audit_logs.json');
+        parent::__construct('audit_logs');
     }
 
     /**
@@ -17,10 +19,10 @@ class AuditLogRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) => ($r['merchant_id'] ?? '') === $merchantId));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC",
+            ['mid' => $merchantId]
+        );
     }
 
     /**
@@ -28,10 +30,10 @@ class AuditLogRepository extends BaseRepository
      */
     public function findByActor(string $actorId): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) => ($r['actor_id'] ?? '') === $actorId));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `actor_id` = :aid ORDER BY `created_at` DESC",
+            ['aid' => $actorId]
+        );
     }
 
     /**
@@ -39,8 +41,10 @@ class AuditLogRepository extends BaseRepository
      */
     public function findByAction(string $action): array
     {
-        $records = $this->readAll();
-        return array_values(array_filter($records, fn($r) => ($r['action'] ?? '') === $action));
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `action` = :action ORDER BY `created_at` DESC",
+            ['action' => $action]
+        );
     }
 
     /**
@@ -48,7 +52,16 @@ class AuditLogRepository extends BaseRepository
      */
     public function getRecent(int $limit = 100): array
     {
-        $records = $this->findAll();
-        return array_slice($records, 0, $limit);
+        return $this->query(
+            "SELECT * FROM `{$this->table}` ORDER BY `created_at` DESC LIMIT " . (int)$limit
+        );
+    }
+
+    /**
+     * Get searchable columns for LIKE search
+     */
+    protected function getSearchableColumns(): array
+    {
+        return ['action', 'description'];
     }
 }

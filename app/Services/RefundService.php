@@ -14,23 +14,21 @@
 require_once base_path('app/Repositories/TransactionRepository.php');
 require_once base_path('app/Services/WalletService.php');
 require_once base_path('app/Services/AuditLogService.php');
+require_once base_path('app/Database.php');
 
 class RefundService
 {
     private TransactionRepository $txRepo;
     private WalletService $walletService;
     private AuditLogService $auditService;
-    private string $storageFile;
+    private PDO $db;
 
     public function __construct()
     {
         $this->txRepo = new TransactionRepository();
         $this->walletService = new WalletService();
         $this->auditService = new AuditLogService();
-        $this->storageFile = storage_path('refunds.json');
-        if (!file_exists($this->storageFile)) {
-            file_put_contents($this->storageFile, '[]', LOCK_EX);
-        }
+        $this->db = Database::getConnection();
     }
 
     /**
@@ -57,8 +55,8 @@ class RefundService
 
         // Calculate total already refunded
         $existingRefunds = $this->getByTransaction($txId);
-        $totalRefunded = array_sum(array_map(fn($r) => ($r['status'] === 'completed') ? $r['amount'] : 0, $existingRefunds));
-        $maxRefundable = $tx['net_amount'] - $totalRefunded;
+        $totalRefunded = array_sum(array_map(fn($r) => ($r['status'] === 'completed') ? (int)$r['amount'] : 0, $existingRefunds));
+        $maxRefundable = (int)$tx['net_amount'] - $totalRefunded;
 
         if ($amount > $maxRefundable) {
             return ['success' => false, 'message' => 'Jumlah refund melebihi sisa yang bisa di-refund (' . format_currency($maxRefundable) . ').'];
@@ -66,7 +64,7 @@ class RefundService
 
         // Check merchant wallet has enough balance
         $wallet = $this->walletService->getByMerchant($tx['merchant_id']);
-        if (!$wallet || $wallet['available_balance'] < $amount) {
+        if (!$wallet || (int)$wallet['available_balance'] < $amount) {
             return ['success' => false, 'message' => 'Saldo merchant tidak cukup untuk refund.'];
         }
 
@@ -90,10 +88,10 @@ class RefundService
         require_once base_path('app/Repositories/WalletRepository.php');
         $walletRepo = new WalletRepository();
         $walletData = $walletRepo->findByMerchant($tx['merchant_id']);
-        
-        $balanceBefore = $walletData['available_balance'];
+
+        $balanceBefore = (int)$walletData['available_balance'];
         $walletRepo->update($walletData['id'], [
-            'available_balance' => $walletData['available_balance'] - $amount,
+            'available_balance' => $balanceBefore - $amount,
             'updated_at' => now(),
         ]);
 
@@ -110,12 +108,13 @@ class RefundService
             'created_at' => now(),
         ]);
 
-        // Save refund
-        $this->saveRefund($refund);
+        // Save refund to DB
+        $stmt = $this->db->prepare("INSERT INTO `refunds` (`id`,`transaction_id`,`order_id`,`merchant_id`,`amount`,`reason`,`type`,`status`,`initiated_by`,`initiated_by_role`,`created_at`) VALUES (:id,:transaction_id,:order_id,:merchant_id,:amount,:reason,:type,:status,:initiated_by,:initiated_by_role,:created_at)");
+        $stmt->execute($refund);
 
         // Update transaction refund info
         $totalRefundedNow = $totalRefunded + $amount;
-        $refundStatus = ($totalRefundedNow >= $tx['net_amount']) ? 'REFUNDED' : 'PARTIAL_REFUND';
+        $refundStatus = ($totalRefundedNow >= (int)$tx['net_amount']) ? 'REFUNDED' : 'PARTIAL_REFUND';
         $this->txRepo->update($txId, [
             'refund_amount' => $totalRefundedNow,
             'refund_status' => $refundStatus,
@@ -143,8 +142,9 @@ class RefundService
      */
     public function getByTransaction(string $transactionId): array
     {
-        $all = $this->loadRefunds();
-        return array_values(array_filter($all, fn($r) => ($r['transaction_id'] ?? '') === $transactionId));
+        $stmt = $this->db->prepare("SELECT * FROM `refunds` WHERE `transaction_id` = :tid ORDER BY `created_at` DESC");
+        $stmt->execute(['tid' => $transactionId]);
+        return $stmt->fetchAll() ?: [];
     }
 
     /**
@@ -152,10 +152,9 @@ class RefundService
      */
     public function getByMerchant(string $merchantId): array
     {
-        $all = $this->loadRefunds();
-        $filtered = array_filter($all, fn($r) => ($r['merchant_id'] ?? '') === $merchantId);
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return array_values($filtered);
+        $stmt = $this->db->prepare("SELECT * FROM `refunds` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC");
+        $stmt->execute(['mid' => $merchantId]);
+        return $stmt->fetchAll() ?: [];
     }
 
     /**
@@ -163,21 +162,7 @@ class RefundService
      */
     public function getAll(): array
     {
-        $all = $this->loadRefunds();
-        usort($all, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $all;
-    }
-
-    private function loadRefunds(): array
-    {
-        $content = file_get_contents($this->storageFile);
-        return json_decode($content, true) ?: [];
-    }
-
-    private function saveRefund(array $refund): void
-    {
-        $all = $this->loadRefunds();
-        $all[] = $refund;
-        file_put_contents($this->storageFile, json_encode($all, JSON_PRETTY_PRINT), LOCK_EX);
+        $stmt = $this->db->query("SELECT * FROM `refunds` ORDER BY `created_at` DESC");
+        return $stmt->fetchAll() ?: [];
     }
 }

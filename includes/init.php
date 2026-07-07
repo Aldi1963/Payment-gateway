@@ -16,30 +16,29 @@ date_default_timezone_set('Asia/Jakarta');
 require_once dirname(__DIR__) . '/app/Helpers.php';
 require_once dirname(__DIR__) . '/app/Auth.php';
 
-// Ensure storage directory and critical files exist
-$storageDir = dirname(__DIR__) . '/storage';
-if (!is_dir($storageDir)) {
-    @mkdir($storageDir, 0755, true);
-}
-$requiredFiles = [
-    'users.json', 'merchants.json', 'transactions.json', 'wallets.json',
-    'withdrawals.json', 'settlements.json', 'webhook_events.json',
-    'audit_logs.json', 'settings.json', 'wallet_ledger.json',
-    'notifications.json', 'config_changes.json', 'fee_rules.json',
-    'webhook_retries.json', 'refunds.json',
-];
-foreach ($requiredFiles as $f) {
-    $path = $storageDir . '/' . $f;
-    if (!file_exists($path)) {
-        @file_put_contents($path, '[]', LOCK_EX);
+// Initialize database connection
+require_once dirname(__DIR__) . '/app/Database.php';
+
+try {
+    // Test that database connection is available
+    // Only attempt if config file exists (skip for install.php)
+    $dbConfigPath = dirname(__DIR__) . '/config/database.php';
+    if (file_exists($dbConfigPath)) {
+        Database::getConnection();
     }
-}
-if (!file_exists($storageDir . '/logs.txt')) {
-    @touch($storageDir . '/logs.txt');
-}
-$rateLimitDir = $storageDir . '/rate_limits';
-if (!is_dir($rateLimitDir)) {
-    @mkdir($rateLimitDir, 0755, true);
+} catch (\Throwable $e) {
+    // Database not configured or unavailable
+    $isInstallPage = str_contains($_SERVER['PHP_SELF'] ?? '', 'install.php');
+    if (!$isInstallPage) {
+        // Show user-friendly error
+        http_response_code(503);
+        echo '<!DOCTYPE html><html><head><title>Database Error</title></head><body>';
+        echo '<h1>Database Connection Error</h1>';
+        echo '<p>Could not connect to the database. Please check your configuration or run the installer.</p>';
+        echo '<p><a href="/install.php">Run Installer</a></p>';
+        echo '</body></html>';
+        exit;
+    }
 }
 
 // Initialize session

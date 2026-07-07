@@ -2,10 +2,10 @@
 /**
  * Fee Rule Repository
  * Stores configurable fee rules with versioning
- * 
+ *
  * Rule types: transaction, withdrawal, settlement
  * Fee types: flat, percentage, random, hybrid, tier
- * 
+ *
  * Each rule has:
  * - id, name, type (transaction|withdrawal|settlement)
  * - fee_type (flat|percentage|random|hybrid|tier)
@@ -21,9 +21,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class FeeRuleRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['config'];
+
     public function __construct()
     {
-        parent::__construct('fee_rules.json');
+        parent::__construct('fee_rules');
     }
 
     /**
@@ -31,14 +33,10 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getActiveGlobalRules(string $ruleType = 'transaction'): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, fn($r) =>
-            ($r['rule_type'] ?? '') === $ruleType &&
-            ($r['status'] ?? '') === 'active' &&
-            empty($r['merchant_id'])
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `rule_type` = :rt AND `status` = :status AND `merchant_id` IS NULL ORDER BY `priority` DESC",
+            ['rt' => $ruleType, 'status' => 'active']
         );
-        usort($filtered, fn($a, $b) => ($b['priority'] ?? 0) - ($a['priority'] ?? 0));
-        return array_values($filtered);
     }
 
     /**
@@ -46,14 +44,10 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getActiveMerchantRules(string $merchantId, string $ruleType = 'transaction'): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, fn($r) =>
-            ($r['rule_type'] ?? '') === $ruleType &&
-            ($r['status'] ?? '') === 'active' &&
-            ($r['merchant_id'] ?? '') === $merchantId
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `rule_type` = :rt AND `status` = :status AND `merchant_id` = :mid ORDER BY `priority` DESC",
+            ['rt' => $ruleType, 'status' => 'active', 'mid' => $merchantId]
         );
-        usort($filtered, fn($a, $b) => ($b['priority'] ?? 0) - ($a['priority'] ?? 0));
-        return array_values($filtered);
     }
 
     /**
@@ -61,10 +55,10 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getAllByType(string $ruleType = 'transaction'): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, fn($r) => ($r['rule_type'] ?? '') === $ruleType);
-        usort($filtered, fn($a, $b) => ($b['priority'] ?? 0) - ($a['priority'] ?? 0));
-        return array_values($filtered);
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `rule_type` = :rt ORDER BY `priority` DESC",
+            ['rt' => $ruleType]
+        );
     }
 
     /**
@@ -72,10 +66,10 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getMerchantRules(string $merchantId): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, fn($r) => ($r['merchant_id'] ?? '') === $merchantId);
-        usort($filtered, fn($a, $b) => ($b['priority'] ?? 0) - ($a['priority'] ?? 0));
-        return array_values($filtered);
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `priority` DESC",
+            ['mid' => $merchantId]
+        );
     }
 
     /**
@@ -83,8 +77,11 @@ class FeeRuleRepository extends BaseRepository
      */
     public function merchantHasCustomRules(string $merchantId, string $ruleType = 'transaction'): bool
     {
-        $rules = $this->getActiveMerchantRules($merchantId, $ruleType);
-        return !empty($rules);
+        $count = $this->fetchColumn(
+            "SELECT COUNT(*) FROM `{$this->table}` WHERE `merchant_id` = :mid AND `rule_type` = :rt AND `status` = :status",
+            ['mid' => $merchantId, 'rt' => $ruleType, 'status' => 'active']
+        );
+        return (int)$count > 0;
     }
 
     /**
@@ -101,14 +98,18 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getMaxPriority(string $ruleType = 'transaction', ?string $merchantId = null): int
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, function($r) use ($ruleType, $merchantId) {
-            if (($r['rule_type'] ?? '') !== $ruleType) return false;
-            if ($merchantId === null) return empty($r['merchant_id']);
-            return ($r['merchant_id'] ?? '') === $merchantId;
-        });
-        if (empty($filtered)) return 0;
-        return max(array_map(fn($r) => $r['priority'] ?? 0, $filtered));
+        if ($merchantId === null) {
+            $result = $this->fetchColumn(
+                "SELECT MAX(`priority`) FROM `{$this->table}` WHERE `rule_type` = :rt AND `merchant_id` IS NULL",
+                ['rt' => $ruleType]
+            );
+        } else {
+            $result = $this->fetchColumn(
+                "SELECT MAX(`priority`) FROM `{$this->table}` WHERE `rule_type` = :rt AND `merchant_id` = :mid",
+                ['rt' => $ruleType, 'mid' => $merchantId]
+            );
+        }
+        return (int)($result ?? 0);
     }
 
     /**
@@ -116,15 +117,22 @@ class FeeRuleRepository extends BaseRepository
      */
     public function getStats(): array
     {
-        $records = $this->readAll();
+        $total = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}`");
+        $active = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `status` = :s", ['s' => 'active']);
+        $transaction = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `rule_type` = :rt", ['rt' => 'transaction']);
+        $withdrawal = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `rule_type` = :rt", ['rt' => 'withdrawal']);
+        $settlement = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `rule_type` = :rt", ['rt' => 'settlement']);
+        $merchantRules = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `merchant_id` IS NOT NULL");
+        $globalRules = (int)$this->fetchColumn("SELECT COUNT(*) FROM `{$this->table}` WHERE `merchant_id` IS NULL");
+
         return [
-            'total_rules' => count($records),
-            'active_rules' => count(array_filter($records, fn($r) => ($r['status'] ?? '') === 'active')),
-            'transaction_rules' => count(array_filter($records, fn($r) => ($r['rule_type'] ?? '') === 'transaction')),
-            'withdrawal_rules' => count(array_filter($records, fn($r) => ($r['rule_type'] ?? '') === 'withdrawal')),
-            'settlement_rules' => count(array_filter($records, fn($r) => ($r['rule_type'] ?? '') === 'settlement')),
-            'merchant_rules' => count(array_filter($records, fn($r) => !empty($r['merchant_id']))),
-            'global_rules' => count(array_filter($records, fn($r) => empty($r['merchant_id']))),
+            'total_rules' => $total,
+            'active_rules' => $active,
+            'transaction_rules' => $transaction,
+            'withdrawal_rules' => $withdrawal,
+            'settlement_rules' => $settlement,
+            'merchant_rules' => $merchantRules,
+            'global_rules' => $globalRules,
         ];
     }
 }

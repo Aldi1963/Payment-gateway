@@ -2,7 +2,7 @@
 /**
  * Config Change Repository
  * Stores merchant configuration change requests with versioning
- * 
+ *
  * Statuses: pending, approved, rejected, canceled, rolled_back
  */
 
@@ -10,9 +10,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class ConfigChangeRepository extends BaseRepository
 {
+    protected array $jsonColumns = [];
+
     public function __construct()
     {
-        parent::__construct('config_changes.json');
+        parent::__construct('config_changes');
     }
 
     /**
@@ -20,12 +22,10 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function findPendingByMerchant(string $merchantId): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) =>
-            ($r['merchant_id'] ?? '') === $merchantId && ($r['status'] ?? '') === 'pending'
-        ));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid AND `status` = :status ORDER BY `created_at` DESC",
+            ['mid' => $merchantId, 'status' => 'pending']
+        );
     }
 
     /**
@@ -33,12 +33,10 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) =>
-            ($r['merchant_id'] ?? '') === $merchantId
-        ));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC",
+            ['mid' => $merchantId]
+        );
     }
 
     /**
@@ -46,12 +44,10 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function findAllPending(): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) =>
-            ($r['status'] ?? '') === 'pending'
-        ));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `status` = :status ORDER BY `created_at` DESC",
+            ['status' => 'pending']
+        );
     }
 
     /**
@@ -59,15 +55,11 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function hasPendingForField(string $merchantId, string $changeType): bool
     {
-        $records = $this->readAll();
-        foreach ($records as $r) {
-            if (($r['merchant_id'] ?? '') === $merchantId &&
-                ($r['change_type'] ?? '') === $changeType &&
-                ($r['status'] ?? '') === 'pending') {
-                return true;
-            }
-        }
-        return false;
+        $count = $this->fetchColumn(
+            "SELECT COUNT(*) FROM `{$this->table}` WHERE `merchant_id` = :mid AND `change_type` = :ct AND `status` = :status",
+            ['mid' => $merchantId, 'ct' => $changeType, 'status' => 'pending']
+        );
+        return (int)$count > 0;
     }
 
     /**
@@ -75,14 +67,10 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function getVersionHistory(string $merchantId, string $changeType): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) =>
-            ($r['merchant_id'] ?? '') === $merchantId &&
-            ($r['change_type'] ?? '') === $changeType &&
-            in_array($r['status'] ?? '', ['approved', 'rolled_back'])
-        ));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid AND `change_type` = :ct AND `status` IN ('approved', 'rolled_back') ORDER BY `created_at` DESC",
+            ['mid' => $merchantId, 'ct' => $changeType]
+        );
     }
 
     /**
@@ -90,6 +78,9 @@ class ConfigChangeRepository extends BaseRepository
      */
     public function countPending(): int
     {
-        return count($this->findAllPending());
+        return (int)$this->fetchColumn(
+            "SELECT COUNT(*) FROM `{$this->table}` WHERE `status` = :status",
+            ['status' => 'pending']
+        );
     }
 }

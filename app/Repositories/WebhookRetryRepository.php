@@ -8,9 +8,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class WebhookRetryRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['payload', 'attempts_log'];
+
     public function __construct()
     {
-        parent::__construct('webhook_retries.json');
+        parent::__construct('webhook_retries');
     }
 
     /**
@@ -19,14 +21,10 @@ class WebhookRetryRepository extends BaseRepository
      */
     public function getReadyToProcess(int $limit = 20): array
     {
-        $records = $this->readAll();
-        $now = now();
-        $filtered = array_filter($records, fn($r) =>
-            ($r['status'] ?? '') === 'pending' &&
-            (($r['next_retry_at'] ?? '') <= $now)
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `status` = :status AND `next_retry_at` <= NOW() ORDER BY `next_retry_at` ASC LIMIT " . (int)$limit,
+            ['status' => 'pending']
         );
-        usort($filtered, fn($a, $b) => strcmp($a['next_retry_at'] ?? '', $b['next_retry_at'] ?? ''));
-        return array_slice(array_values($filtered), 0, $limit);
     }
 
     /**
@@ -34,10 +32,10 @@ class WebhookRetryRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId, int $limit = 50): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, fn($r) => ($r['merchant_id'] ?? '') === $merchantId);
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return array_slice(array_values($filtered), 0, $limit);
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC LIMIT " . (int)$limit,
+            ['mid' => $merchantId]
+        );
     }
 
     /**
@@ -45,7 +43,9 @@ class WebhookRetryRepository extends BaseRepository
      */
     public function countPending(): int
     {
-        $records = $this->readAll();
-        return count(array_filter($records, fn($r) => ($r['status'] ?? '') === 'pending'));
+        return (int)$this->fetchColumn(
+            "SELECT COUNT(*) FROM `{$this->table}` WHERE `status` = :status",
+            ['status' => 'pending']
+        );
     }
 }

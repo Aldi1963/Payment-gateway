@@ -7,9 +7,11 @@ require_once __DIR__ . '/BaseRepository.php';
 
 class TransactionRepository extends BaseRepository
 {
+    protected array $jsonColumns = ['fee_snapshot'];
+
     public function __construct()
     {
-        parent::__construct('transactions.json');
+        parent::__construct('transactions');
     }
 
     /**
@@ -17,13 +19,9 @@ class TransactionRepository extends BaseRepository
      */
     public function findByOrderId(string $orderId): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (($record['order_id'] ?? '') === $orderId) {
-                return $record;
-            }
-        }
-        return null;
+        return $this->fetchOne("SELECT * FROM `{$this->table}` WHERE `order_id` = :oid LIMIT 1", [
+            'oid' => $orderId
+        ]);
     }
 
     /**
@@ -31,13 +29,10 @@ class TransactionRepository extends BaseRepository
      */
     public function findByOrderIdAndMerchant(string $orderId, string $merchantId): ?array
     {
-        $records = $this->readAll();
-        foreach ($records as $record) {
-            if (($record['order_id'] ?? '') === $orderId && ($record['merchant_id'] ?? '') === $merchantId) {
-                return $record;
-            }
-        }
-        return null;
+        return $this->fetchOne(
+            "SELECT * FROM `{$this->table}` WHERE `order_id` = :oid AND `merchant_id` = :mid LIMIT 1",
+            ['oid' => $orderId, 'mid' => $merchantId]
+        );
     }
 
     /**
@@ -45,20 +40,21 @@ class TransactionRepository extends BaseRepository
      */
     public function findByMerchant(string $merchantId, array $filters = []): array
     {
-        $records = $this->readAll();
-        $filtered = array_filter($records, function($r) use ($merchantId, $filters) {
-            if (($r['merchant_id'] ?? '') !== $merchantId) return false;
-            if (!empty($filters['status']) && ($r['status'] ?? '') !== $filters['status']) return false;
-            if (!empty($filters['search'])) {
-                $search = strtolower($filters['search']);
-                $searchable = strtolower(($r['order_id'] ?? '') . ' ' . ($r['customer_name'] ?? '') . ' ' . ($r['customer_email'] ?? ''));
-                if (!str_contains($searchable, $search)) return false;
-            }
-            return true;
-        });
+        $where = ["`merchant_id` = :mid"];
+        $params = ['mid' => $merchantId];
 
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return array_values($filtered);
+        if (!empty($filters['status'])) {
+            $where[] = "`status` = :status";
+            $params['status'] = $filters['status'];
+        }
+
+        if (!empty($filters['search'])) {
+            $where[] = "(`order_id` LIKE :search OR `customer_name` LIKE :search OR `customer_email` LIKE :search)";
+            $params['search'] = '%' . $filters['search'] . '%';
+        }
+
+        $sql = "SELECT * FROM `{$this->table}` WHERE " . implode(' AND ', $where) . " ORDER BY `created_at` DESC";
+        return $this->query($sql, $params);
     }
 
     /**
@@ -66,8 +62,15 @@ class TransactionRepository extends BaseRepository
      */
     public function getRecent(int $limit = 10, ?string $merchantId = null): array
     {
-        $records = $merchantId ? $this->findByMerchant($merchantId) : $this->findAll();
-        return array_slice($records, 0, $limit);
+        if ($merchantId) {
+            return $this->query(
+                "SELECT * FROM `{$this->table}` WHERE `merchant_id` = :mid ORDER BY `created_at` DESC LIMIT " . (int)$limit,
+                ['mid' => $merchantId]
+            );
+        }
+        return $this->query(
+            "SELECT * FROM `{$this->table}` ORDER BY `created_at` DESC LIMIT " . (int)$limit
+        );
     }
 
     /**
@@ -75,9 +78,17 @@ class TransactionRepository extends BaseRepository
      */
     public function findByStatus(string $status): array
     {
-        $records = $this->readAll();
-        $filtered = array_values(array_filter($records, fn($r) => ($r['status'] ?? '') === $status));
-        usort($filtered, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
-        return $filtered;
+        return $this->query(
+            "SELECT * FROM `{$this->table}` WHERE `status` = :status ORDER BY `created_at` DESC",
+            ['status' => $status]
+        );
+    }
+
+    /**
+     * Get searchable columns for LIKE search
+     */
+    protected function getSearchableColumns(): array
+    {
+        return ['order_id', 'customer_name', 'customer_email'];
     }
 }
