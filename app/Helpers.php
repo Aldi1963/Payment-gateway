@@ -1,0 +1,399 @@
+<?php
+/**
+ * Helper Functions
+ * Payment Gateway SaaS Multi Merchant
+ */
+
+/**
+ * Get application config
+ */
+function config(string $key, mixed $default = null): mixed
+{
+    static $configs = [];
+    
+    $parts = explode('.', $key);
+    $file = $parts[0];
+    
+    if (!isset($configs[$file])) {
+        $path = dirname(__DIR__) . '/config/' . $file . '.php';
+        if (file_exists($path)) {
+            $configs[$file] = require $path;
+        } else {
+            return $default;
+        }
+    }
+    
+    $value = $configs[$file];
+    array_shift($parts);
+    
+    foreach ($parts as $part) {
+        if (is_array($value) && isset($value[$part])) {
+            $value = $value[$part];
+        } else {
+            return $default;
+        }
+    }
+    
+    return $value;
+}
+
+/**
+ * Get base path
+ */
+function base_path(string $path = ''): string
+{
+    return dirname(__DIR__) . ($path ? '/' . ltrim($path, '/') : '');
+}
+
+/**
+ * Get storage path
+ */
+function storage_path(string $path = ''): string
+{
+    return base_path('storage') . ($path ? '/' . ltrim($path, '/') : '');
+}
+
+/**
+ * Generate UUID v4
+ */
+function generate_uuid(): string
+{
+    $data = random_bytes(16);
+    $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+    $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+/**
+ * Generate random string
+ */
+function generate_random(int $length = 16): string
+{
+    return bin2hex(random_bytes($length / 2));
+}
+
+/**
+ * Generate order ID
+ */
+function generate_order_id(): string
+{
+    $date = date('Ymd');
+    $random = strtoupper(substr(generate_random(6), 0, 6));
+    return "INV-{$date}-{$random}";
+}
+
+/**
+ * Generate API key
+ */
+function generate_api_key(): string
+{
+    return 'pk_' . generate_random(32);
+}
+
+/**
+ * Escape HTML output
+ */
+function e(mixed $value): string
+{
+    if ($value === null) {
+        return '';
+    }
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Format currency (Indonesian Rupiah)
+ */
+function format_currency(float|int $amount): string
+{
+    return 'Rp ' . number_format($amount, 0, ',', '.');
+}
+
+/**
+ * Format date
+ */
+function format_date(string $datetime, string $format = 'd M Y H:i'): string
+{
+    if (empty($datetime)) return '-';
+    return date($format, strtotime($datetime));
+}
+
+/**
+ * Get current datetime in ISO 8601 format
+ */
+function now(): string
+{
+    return date('Y-m-d H:i:s');
+}
+
+/**
+ * Get client IP address
+ */
+function get_client_ip(): string
+{
+    $headers = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'];
+    foreach ($headers as $header) {
+        if (!empty($_SERVER[$header])) {
+            $ips = explode(',', $_SERVER[$header]);
+            return trim($ips[0]);
+        }
+    }
+    return '0.0.0.0';
+}
+
+/**
+ * Get user agent
+ */
+function get_user_agent(): string
+{
+    return $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+}
+
+/**
+ * Redirect to URL
+ */
+function redirect(string $url): never
+{
+    header('Location: ' . $url);
+    exit;
+}
+
+/**
+ * Return JSON response
+ */
+function json_response(mixed $data, int $code = 200): never
+{
+    http_response_code($code);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/**
+ * Set flash message
+ */
+function flash(string $type, string $message): void
+{
+    $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
+}
+
+/**
+ * Get and clear flash messages
+ */
+function get_flash(): array
+{
+    $messages = $_SESSION['flash'] ?? [];
+    unset($_SESSION['flash']);
+    return $messages;
+}
+
+/**
+ * Generate CSRF token
+ */
+function csrf_token(): string
+{
+    if (empty($_SESSION['_csrf_token'])) {
+        $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['_csrf_token'];
+}
+
+/**
+ * Get CSRF hidden input field
+ */
+function csrf_field(): string
+{
+    return '<input type="hidden" name="_csrf_token" value="' . csrf_token() . '">';
+}
+
+/**
+ * Verify CSRF token
+ */
+function verify_csrf(): bool
+{
+    $token = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    $sessionToken = $_SESSION['_csrf_token'] ?? '';
+    
+    if (empty($token) || empty($sessionToken)) {
+        return false;
+    }
+    
+    return hash_equals($sessionToken, $token);
+}
+
+/**
+ * Validate email
+ */
+function is_valid_email(string $email): bool
+{
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+/**
+ * Validate phone number (Indonesian format)
+ */
+function is_valid_phone(string $phone): bool
+{
+    return preg_match('/^(\+62|62|0)8[1-9][0-9]{6,11}$/', $phone) === 1;
+}
+
+/**
+ * Mask API key for display
+ */
+function mask_api_key(string $key): string
+{
+    if (strlen($key) <= 8) {
+        return str_repeat('*', strlen($key));
+    }
+    return substr($key, 0, 6) . str_repeat('*', strlen($key) - 10) . substr($key, -4);
+}
+
+/**
+ * Extract nested value from array using dot notation
+ */
+function array_dot_get(array $array, string $key, mixed $default = null): mixed
+{
+    $keys = explode('.', $key);
+    $value = $array;
+    
+    foreach ($keys as $k) {
+        if (is_array($value) && isset($value[$k])) {
+            $value = $value[$k];
+        } else {
+            return $default;
+        }
+    }
+    
+    return $value;
+}
+
+/**
+ * Extract value from array using multiple possible keys
+ */
+function extract_from_keys(array $data, array $keys, mixed $default = null): mixed
+{
+    foreach ($keys as $key) {
+        $value = array_dot_get($data, $key);
+        if ($value !== null) {
+            return $value;
+        }
+    }
+    return $default;
+}
+
+/**
+ * Truncate text
+ */
+function truncate(string $text, int $length = 50, string $suffix = '...'): string
+{
+    if (mb_strlen($text) <= $length) {
+        return $text;
+    }
+    return mb_substr($text, 0, $length) . $suffix;
+}
+
+/**
+ * Get status badge CSS class
+ */
+function status_badge_class(string $status): string
+{
+    return match(strtoupper($status)) {
+        'PAID', 'SUCCESS', 'COMPLETED', 'ACTIVE', 'APPROVED', 'TRANSFERRED' => 'bg-emerald-100 text-emerald-800',
+        'PENDING', 'WAITING', 'REVIEWING', 'PROCESSING' => 'bg-amber-100 text-amber-800',
+        'FAILED', 'ERROR', 'REJECTED', 'SUSPENDED' => 'bg-red-100 text-red-800',
+        'EXPIRED', 'CANCELED', 'INACTIVE' => 'bg-slate-100 text-slate-800',
+        default => 'bg-blue-100 text-blue-800',
+    };
+}
+
+/**
+ * Sanitize input string
+ */
+function sanitize(mixed $value): string
+{
+    if ($value === null) return '';
+    return trim(strip_tags((string)$value));
+}
+
+/**
+ * Check if request is AJAX
+ */
+function is_ajax(): bool
+{
+    return (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
+           (!empty($_SERVER['HTTP_ACCEPT']) && 
+            str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
+}
+
+/**
+ * Check if request method is POST
+ */
+function is_post(): bool
+{
+    return $_SERVER['REQUEST_METHOD'] === 'POST';
+}
+
+/**
+ * Log message to file
+ */
+function app_log(string $message, string $level = 'INFO'): void
+{
+    $logFile = storage_path('logs.txt');
+    $timestamp = date('Y-m-d H:i:s');
+    $line = "[{$timestamp}] [{$level}] {$message}" . PHP_EOL;
+    file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Debug dump and die
+ */
+function dd(mixed ...$vars): never
+{
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<pre>';
+    foreach ($vars as $var) {
+        var_dump($var);
+    }
+    echo '</pre>';
+    exit;
+}
+
+/**
+ * Get pagination data
+ */
+function paginate(array $items, int $page = 1, int $perPage = 20): array
+{
+    $total = count($items);
+    $totalPages = max(1, ceil($total / $perPage));
+    $page = max(1, min($page, $totalPages));
+    $offset = ($page - 1) * $perPage;
+    
+    return [
+        'data' => array_slice($items, $offset, $perPage),
+        'current_page' => $page,
+        'per_page' => $perPage,
+        'total' => $total,
+        'total_pages' => $totalPages,
+        'has_prev' => $page > 1,
+        'has_next' => $page < $totalPages,
+    ];
+}
+
+/**
+ * Get the app URL
+ */
+function app_url(string $path = ''): string
+{
+    $url = config('app.app_url', 'http://localhost');
+    return rtrim($url, '/') . '/' . ltrim($path, '/');
+}
+
+/**
+ * Check if value is valid JSON
+ */
+function is_valid_json(string $string): bool
+{
+    json_decode($string);
+    return json_last_error() === JSON_ERROR_NONE;
+}

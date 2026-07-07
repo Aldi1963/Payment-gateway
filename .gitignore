@@ -1,0 +1,22 @@
+# Storage data files (contain sensitive data)
+storage/*.json
+storage/*.backup
+storage/logs.txt
+!storage/.gitkeep
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+*.bak
