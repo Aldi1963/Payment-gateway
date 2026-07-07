@@ -17,6 +17,7 @@ $merchantMenus = [
     ['url' => '/merchant/staff.php', 'icon' => 'staff', 'label' => 'Staff', 'page' => 'staff'],
     ['url' => '/merchant/api-keys.php', 'icon' => 'key', 'label' => 'API Keys', 'page' => 'api-keys'],
     ['url' => '/merchant/webhook-settings.php', 'icon' => 'webhook', 'label' => 'Webhook & URL', 'page' => 'webhook-settings'],
+    ['url' => '/merchant/webhook-test.php', 'icon' => 'test', 'label' => 'Test Webhook', 'page' => 'webhook-test'],
     ['url' => '/merchant/config-changes.php', 'icon' => 'shield', 'label' => 'Riwayat Perubahan', 'page' => 'config-changes'],
     ['url' => '/merchant/settings.php', 'icon' => 'settings', 'label' => 'Pengaturan', 'page' => 'settings'],
     ['url' => '/merchant/profile.php', 'icon' => 'profile', 'label' => 'Profil', 'page' => 'profile'],
