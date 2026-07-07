@@ -62,19 +62,29 @@ class WebhookService
         }
 
         // Validate signature using merchant API key as secret
+        // SECURITY: Signature is MANDATORY - reject requests without signature
         $secretKey = $merchant['api_key'];
-        if (!empty($signature)) {
-            $isValid = $this->aldiQris->validateWebhookSignature($rawPayload, $signature, $secretKey);
-            if (!$isValid) {
-                $this->logEvent('invalid_signature', $merchant['id'], $rawPayload, 'Invalid webhook signature');
-                $this->auditService->log(
-                    'system', 'system', $merchant['id'],
-                    'webhook_invalid',
-                    "Invalid webhook signature for order {$orderId}",
-                    ['order_id' => $orderId, 'ip' => get_client_ip()]
-                );
-                return ['success' => false, 'message' => 'Invalid signature', 'code' => 403];
-            }
+        if (empty($signature)) {
+            $this->logEvent('invalid_signature', $merchant['id'], $rawPayload, 'Missing webhook signature header');
+            $this->auditService->log(
+                'system', 'system', $merchant['id'],
+                'webhook_invalid',
+                "Missing X-Signature header for order {$orderId}",
+                ['order_id' => $orderId, 'ip' => get_client_ip()]
+            );
+            return ['success' => false, 'message' => 'Missing signature', 'code' => 401];
+        }
+
+        $isValid = $this->aldiQris->validateWebhookSignature($rawPayload, $signature, $secretKey);
+        if (!$isValid) {
+            $this->logEvent('invalid_signature', $merchant['id'], $rawPayload, 'Invalid webhook signature');
+            $this->auditService->log(
+                'system', 'system', $merchant['id'],
+                'webhook_invalid',
+                "Invalid webhook signature for order {$orderId}",
+                ['order_id' => $orderId, 'ip' => get_client_ip()]
+            );
+            return ['success' => false, 'message' => 'Invalid signature', 'code' => 403];
         }
 
         // Extract status

@@ -14,6 +14,7 @@ class MerchantRepository extends BaseRepository
 
     /**
      * Find merchant by API key
+     * NOTE: Not timing-safe. Use findByApiKeySecure() for authentication.
      */
     public function findByApiKey(string $apiKey): ?array
     {
@@ -24,6 +25,28 @@ class MerchantRepository extends BaseRepository
             }
         }
         return null;
+    }
+
+    /**
+     * Find merchant by API key (timing-safe)
+     * SECURITY: Uses hash_equals to prevent timing attacks.
+     * Iterates ALL records to prevent early-exit timing leak.
+     */
+    public function findByApiKeySecure(string $apiKey): ?array
+    {
+        $records = $this->readAll();
+        $found = null;
+        
+        // Always iterate ALL records (constant-time relative to dataset size)
+        foreach ($records as $record) {
+            $storedKey = $record['api_key'] ?? '';
+            if (!empty($storedKey) && hash_equals($storedKey, $apiKey)) {
+                $found = $record;
+                // Don't break - continue iterating to prevent timing leak
+            }
+        }
+        
+        return $found;
     }
 
     /**

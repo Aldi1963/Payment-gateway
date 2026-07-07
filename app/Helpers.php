@@ -181,17 +181,14 @@ function now(): string
 
 /**
  * Get client IP address
+ * WARNING: This is for logging/display only. For security decisions, use Auth::getTrustedClientIp()
  */
 function get_client_ip(): string
 {
-    $headers = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'];
-    foreach ($headers as $header) {
-        if (!empty($_SERVER[$header])) {
-            $ips = explode(',', $_SERVER[$header]);
-            return trim($ips[0]);
-        }
-    }
-    return '0.0.0.0';
+    // For security-critical operations, only trust REMOTE_ADDR
+    // X-Forwarded-For headers are ONLY trusted if behind a known proxy
+    // configured via 'trusted_proxy_ips' setting
+    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
 /**
@@ -242,6 +239,7 @@ function get_flash(): array
 
 /**
  * Generate CSRF token
+ * Uses per-session token with rotation after successful verification
  */
 function csrf_token(): string
 {
@@ -261,6 +259,7 @@ function csrf_field(): string
 
 /**
  * Verify CSRF token
+ * SECURITY: Rotates token after successful verification to prevent replay
  */
 function verify_csrf(): bool
 {
@@ -271,7 +270,14 @@ function verify_csrf(): bool
         return false;
     }
     
-    return hash_equals($sessionToken, $token);
+    $valid = hash_equals($sessionToken, $token);
+    
+    if ($valid) {
+        // Rotate CSRF token after successful use (prevent replay attacks)
+        $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+    }
+    
+    return $valid;
 }
 
 /**
@@ -389,13 +395,36 @@ function is_post(): bool
 
 /**
  * Log message to file
+ * SECURITY: Automatically sanitizes sensitive data (API keys, passwords)
  */
 function app_log(string $message, string $level = 'INFO'): void
 {
     $logFile = storage_path('logs.txt');
+    
+    // Sanitize sensitive data from log messages
+    $message = sanitize_log_message($message);
+    
     $timestamp = date('Y-m-d H:i:s');
     $line = "[{$timestamp}] [{$level}] {$message}" . PHP_EOL;
     file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Sanitize sensitive data from log messages
+ * Masks API keys, passwords, tokens in log output
+ */
+function sanitize_log_message(string $message): string
+{
+    // Mask Bearer tokens: "Bearer pk_abc123..." -> "Bearer pk_ab****"
+    $message = preg_replace('/Bearer\s+([a-zA-Z0-9_]{6})[a-zA-Z0-9_]+/i', 'Bearer $1****', $message);
+    
+    // Mask API keys in JSON: "api_key":"pk_..." -> "api_key":"[REDACTED]"
+    $message = preg_replace('/(api_key|secret_key|password|token)(["\s:=]+)(["\']?)([^"\'&\s]{8})[^"\'&\s]*/i', '$1$2$3$4****', $message);
+    
+    // Mask pk_ prefixed keys anywhere
+    $message = preg_replace('/pk_[a-f0-9]{6}[a-f0-9]+/', 'pk_******', $message);
+    
+    return $message;
 }
 
 /**

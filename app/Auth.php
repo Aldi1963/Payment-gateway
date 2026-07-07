@@ -43,35 +43,31 @@ class Auth
     public static function attempt(string $email, string $password): array
     {
         require_once base_path('app/Repositories/UserRepository.php');
+        require_once base_path('app/RateLimiter.php');
         $userRepo = new UserRepository();
+        $rateLimiter = new RateLimiter();
         
-        // Rate limiting check
-        $rateLimitKey = 'login_attempts_' . md5($email . get_client_ip());
-        $attempts = $_SESSION[$rateLimitKey] ?? ['count' => 0, 'last_attempt' => 0];
+        // File-based rate limiting (cannot be bypassed by clearing cookies)
+        $ip = self::getTrustedClientIp();
+        $rateLimitKey = RateLimiter::loginKey($email, $ip);
+        $maxAttempts = (int)setting('login_max_attempts', config('app.login_max_attempts', 5));
+        $lockoutTime = (int)setting('login_lockout_time', config('app.login_lockout_time', 900));
         
-        $maxAttempts = config('app.login_max_attempts', 5);
-        $lockoutTime = config('app.login_lockout_time', 900);
-        
-        if ($attempts['count'] >= $maxAttempts) {
-            $timeSince = time() - $attempts['last_attempt'];
-            if ($timeSince < $lockoutTime) {
-                $remaining = ceil(($lockoutTime - $timeSince) / 60);
-                return [
-                    'success' => false,
-                    'message' => "Terlalu banyak percobaan login. Coba lagi dalam {$remaining} menit."
-                ];
-            }
-            // Reset after lockout period
-            $attempts = ['count' => 0, 'last_attempt' => 0];
+        $rateCheck = $rateLimiter->check($rateLimitKey, $maxAttempts, $lockoutTime);
+        if (!$rateCheck['allowed']) {
+            $remaining = ceil($rateCheck['retry_after'] / 60);
+            app_log("Rate limited login attempt for {$email} from IP {$ip}", 'WARNING');
+            return [
+                'success' => false,
+                'message' => "Terlalu banyak percobaan login. Coba lagi dalam {$remaining} menit."
+            ];
         }
         
         $user = $userRepo->findByEmail($email);
         
         if (!$user || !password_verify($password, $user['password_hash'])) {
-            $attempts['count']++;
-            $attempts['last_attempt'] = time();
-            $_SESSION[$rateLimitKey] = $attempts;
-            
+            // Record failed attempt
+            $rateLimiter->hit($rateLimitKey, $lockoutTime);
             return ['success' => false, 'message' => 'Email atau password salah.'];
         }
         
@@ -79,8 +75,8 @@ class Auth
             return ['success' => false, 'message' => 'Akun Anda tidak aktif. Hubungi administrator.'];
         }
         
-        // Clear rate limit
-        unset($_SESSION[$rateLimitKey]);
+        // Clear rate limit on success
+        $rateLimiter->clear($rateLimitKey);
         
         // Regenerate session after successful login
         session_regenerate_id(true);
@@ -93,6 +89,8 @@ class Auth
         $_SESSION['merchant_id'] = $user['merchant_id'] ?? null;
         $_SESSION['permissions'] = $user['permissions'] ?? [];
         $_SESSION['logged_in_at'] = time();
+        $_SESSION['_fingerprint'] = self::generateFingerprint();
+        $_SESSION['_login_ip'] = self::getTrustedClientIp();
         
         // Update last login
         $userRepo->update($user['id'], ['last_login_at' => now()]);
@@ -340,5 +338,64 @@ class Auth
             flash('error', 'Sesi telah kedaluwarsa. Silakan coba lagi.');
             redirect($_SERVER['HTTP_REFERER'] ?? '/login.php');
         }
+    }
+
+    /**
+     * Get trusted client IP (only REMOTE_ADDR is trusted unless behind known proxy)
+     * SECURITY: Never trust X-Forwarded-For from public internet
+     */
+    public static function getTrustedClientIp(): string
+    {
+        // Only trust REMOTE_ADDR by default (safe from spoofing)
+        // If behind a KNOWN reverse proxy (Cloudflare, nginx, etc),
+        // the admin should configure trusted_proxy_ips in settings
+        $trustedProxies = setting('trusted_proxy_ips', '');
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+        if (!empty($trustedProxies)) {
+            $proxies = array_map('trim', explode(',', $trustedProxies));
+            if (in_array($remoteAddr, $proxies)) {
+                // Behind trusted proxy - use forwarded IP
+                if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+                    return trim($_SERVER['HTTP_X_REAL_IP']);
+                }
+                if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                    $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+                    return trim($ips[0]);
+                }
+            }
+        }
+
+        return $remoteAddr;
+    }
+
+    /**
+     * Validate session fingerprint (detect session hijacking)
+     * Checks if the current request matches the session's original fingerprint.
+     */
+    public static function validateSession(): bool
+    {
+        if (!self::check()) return true; // no session to validate
+
+        $fingerprint = self::generateFingerprint();
+        if (isset($_SESSION['_fingerprint'])) {
+            if (!hash_equals($_SESSION['_fingerprint'], $fingerprint)) {
+                // Potential session hijacking - destroy session
+                app_log("Session fingerprint mismatch for user " . ($_SESSION['user_id'] ?? 'unknown') . " from IP " . self::getTrustedClientIp(), 'SECURITY');
+                self::logout();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Generate session fingerprint
+     */
+    private static function generateFingerprint(): string
+    {
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $accept = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+        return hash('sha256', $ua . '|' . $accept);
     }
 }

@@ -2,9 +2,16 @@
 /**
  * API Controller
  * Handles merchant API requests (external integrations)
+ * 
+ * SECURITY:
+ * - Rate limiting per IP (file-based)
+ * - Timing-safe API key comparison
+ * - IP whitelist enforcement
+ * - Input size limit
  */
 
 require_once base_path('app/Helpers.php');
+require_once base_path('app/RateLimiter.php');
 require_once base_path('app/Repositories/MerchantRepository.php');
 require_once base_path('app/Services/TransactionService.php');
 require_once base_path('app/Services/WalletService.php');
@@ -13,27 +20,83 @@ require_once base_path('app/Services/WithdrawalService.php');
 class ApiController
 {
     private ?array $merchant = null;
+    private RateLimiter $rateLimiter;
+
+    public function __construct()
+    {
+        $this->rateLimiter = new RateLimiter();
+    }
 
     /**
      * Authenticate API request via Bearer token
+     * SECURITY: timing-safe comparison, rate limiting, IP whitelist
      */
     public function authenticate(): bool
     {
+        $ip = Auth::getTrustedClientIp();
+
+        // Rate limit API authentication attempts per IP
+        $rateLimitKey = RateLimiter::apiKey('auth', $ip);
+        $maxAttempts = (int)setting('api_rate_limit', 60); // 60 requests per window
+        $window = (int)setting('api_rate_window', 60); // 60-second window
+
+        $rateCheck = $this->rateLimiter->check($rateLimitKey, $maxAttempts, $window);
+        if (!$rateCheck['allowed']) {
+            header('Retry-After: ' . $rateCheck['retry_after']);
+            header('X-RateLimit-Limit: ' . $maxAttempts);
+            header('X-RateLimit-Remaining: 0');
+            json_response([
+                'error' => 'Too Many Requests',
+                'message' => 'Rate limit exceeded. Try again in ' . $rateCheck['retry_after'] . ' seconds.',
+                'retry_after' => $rateCheck['retry_after'],
+            ], 429);
+        }
+
+        // Record this attempt
+        $this->rateLimiter->hit($rateLimitKey, $window);
+
+        // Set rate limit headers
+        header('X-RateLimit-Limit: ' . $maxAttempts);
+        header('X-RateLimit-Remaining: ' . max(0, $rateCheck['remaining'] - 1));
+
+        // Extract Bearer token
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (!str_starts_with($authHeader, 'Bearer ')) {
             json_response(['error' => 'Unauthorized', 'message' => 'Missing or invalid Authorization header'], 401);
         }
 
         $apiKey = substr($authHeader, 7);
+
+        // Validate API key format (basic sanity check before DB lookup)
+        if (strlen($apiKey) < 10 || strlen($apiKey) > 128) {
+            json_response(['error' => 'Unauthorized', 'message' => 'Invalid API key format'], 401);
+        }
+
+        // Find merchant by API key (timing-safe)
         $merchantRepo = new MerchantRepository();
-        $this->merchant = $merchantRepo->findByApiKey($apiKey);
+        $this->merchant = $merchantRepo->findByApiKeySecure($apiKey);
 
         if (!$this->merchant) {
+            // Add extra delay on failed auth to prevent timing attacks
+            usleep(random_int(100000, 300000)); // 100-300ms
             json_response(['error' => 'Unauthorized', 'message' => 'Invalid API key'], 401);
         }
 
         if ($this->merchant['status'] !== 'active') {
             json_response(['error' => 'Forbidden', 'message' => 'Merchant account is not active'], 403);
+        }
+
+        // IP Whitelist enforcement
+        $whitelist = $this->merchant['ip_whitelist'] ?? '';
+        if (!empty($whitelist)) {
+            $allowedIps = is_array($whitelist) 
+                ? $whitelist 
+                : array_filter(array_map('trim', explode("\n", $whitelist)));
+            
+            if (!empty($allowedIps) && !in_array($ip, $allowedIps)) {
+                app_log("API access denied for merchant {$this->merchant['id']} from IP {$ip} (not whitelisted)", 'SECURITY');
+                json_response(['error' => 'Forbidden', 'message' => 'IP address not allowed'], 403);
+            }
         }
 
         return true;
@@ -46,7 +109,13 @@ class ApiController
     {
         $this->authenticate();
 
-        $input = json_decode(file_get_contents('php://input'), true);
+        // Limit request body size
+        $rawInput = file_get_contents('php://input');
+        if (strlen($rawInput) > 65536) {
+            json_response(['error' => 'Bad Request', 'message' => 'Request body too large'], 413);
+        }
+
+        $input = json_decode($rawInput, true);
         if (!$input) {
             json_response(['error' => 'Bad Request', 'message' => 'Invalid JSON body'], 400);
         }
@@ -81,6 +150,9 @@ class ApiController
     public function getTransaction(string $orderId): void
     {
         $this->authenticate();
+
+        // Sanitize order_id input
+        $orderId = preg_replace('/[^a-zA-Z0-9\-_]/', '', $orderId);
 
         $transactionService = new TransactionService();
         $tx = $transactionService->findByOrderId($orderId);

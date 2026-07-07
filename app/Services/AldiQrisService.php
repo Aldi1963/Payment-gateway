@@ -30,6 +30,17 @@ class AldiQrisService
     public function createTransaction(array $payload, string $apiKey): array
     {
         $url = rtrim($this->baseUrl, '/') . $this->endpoint;
+
+        // SECURITY: SSRF prevention - validate URL scheme and block private networks
+        if (!$this->isUrlSafe($url)) {
+            app_log("SSRF blocked: attempted request to unsafe URL: {$url}", 'SECURITY');
+            return [
+                'success' => false,
+                'error' => 'Invalid gateway URL configuration',
+                'http_code' => 0,
+                'raw_response' => null,
+            ];
+        }
         
         // Build the request payload (only order_id and amount are required)
         $requestData = [
@@ -182,5 +193,50 @@ class AldiQrisService
         $normalized = strtolower(trim($rawStatus));
         
         return $mapping[$normalized] ?? strtoupper($rawStatus);
+    }
+
+    /**
+     * SECURITY: Validate URL is safe (prevent SSRF)
+     * Blocks: private IPs, local networks, non-HTTPS (in production)
+     */
+    private function isUrlSafe(string $url): bool
+    {
+        $parsed = parse_url($url);
+        if (!$parsed || empty($parsed['host'])) {
+            return false;
+        }
+
+        // Must be HTTPS in production
+        $scheme = strtolower($parsed['scheme'] ?? 'http');
+        if ($this->sslVerify && $scheme !== 'https') {
+            return false;
+        }
+
+        // Block non-http(s) schemes
+        if (!in_array($scheme, ['http', 'https'])) {
+            return false;
+        }
+
+        $host = $parsed['host'];
+
+        // Block localhost and common local names
+        $blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1', 'metadata.google.internal'];
+        if (in_array(strtolower($host), $blockedHosts)) {
+            return false;
+        }
+
+        // Resolve hostname and check for private IP ranges
+        $ip = gethostbyname($host);
+        if ($ip === $host) {
+            // Could not resolve - allow (DNS might not be available)
+            return true;
+        }
+
+        // Block private and reserved IP ranges
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+
+        return true;
     }
 }
