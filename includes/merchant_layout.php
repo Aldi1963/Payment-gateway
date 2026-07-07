@@ -16,7 +16,8 @@ $merchantMenus = [
     ['url' => '/merchant/withdraw-history.php', 'icon' => 'history', 'label' => 'Riwayat Penarikan', 'page' => 'withdraw-history'],
     ['url' => '/merchant/staff.php', 'icon' => 'staff', 'label' => 'Staff', 'page' => 'staff'],
     ['url' => '/merchant/api-keys.php', 'icon' => 'key', 'label' => 'API Keys', 'page' => 'api-keys'],
-    ['url' => '/merchant/webhook-settings.php', 'icon' => 'webhook', 'label' => 'Webhook', 'page' => 'webhook-settings'],
+    ['url' => '/merchant/webhook-settings.php', 'icon' => 'webhook', 'label' => 'Webhook & URL', 'page' => 'webhook-settings'],
+    ['url' => '/merchant/config-changes.php', 'icon' => 'shield', 'label' => 'Riwayat Perubahan', 'page' => 'config-changes'],
     ['url' => '/merchant/settings.php', 'icon' => 'settings', 'label' => 'Pengaturan', 'page' => 'settings'],
     ['url' => '/merchant/profile.php', 'icon' => 'profile', 'label' => 'Profil', 'page' => 'profile'],
 ];
