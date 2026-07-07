@@ -76,6 +76,24 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     </a>
 </div>
 
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-3">Revenue 7 Hari Terakhir</h3>
+        <canvas id="mRevenueChart" height="180"></canvas>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-3">Transaksi Harian</h3>
+        <canvas id="mTxChart" height="180"></canvas>
+    </div>
+</div>
+
+<!-- Export -->
+<div class="flex justify-end mb-4 gap-2">
+    <a href="/export.php?type=transactions&format=csv" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200">Export Transaksi CSV</a>
+    <a href="/export.php?type=withdrawals&format=csv" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200">Export Withdrawal CSV</a>
+</div>
+
 <!-- Recent Transactions -->
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -110,4 +128,59 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <?php endif; ?>
 </div>
 
+<?php
+// Chart data - last 7 days
+$mChartDays = []; $mChartRev = []; $mChartCount = [];
+for ($i = 6; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-{$i} days"));
+    $mChartDays[] = date('d/m', strtotime($date));
+    $dayRev = 0; $dayCnt = 0;
+    foreach ($recentTx as $tx) {
+        if (substr($tx['created_at'] ?? '', 0, 10) === $date) {
+            $dayCnt++;
+            if (($tx['status'] ?? '') === 'PAID') $dayRev += $tx['net_amount'] ?? 0;
+        }
+    }
+    $mChartRev[] = $dayRev;
+    $mChartCount[] = $dayCnt;
+}
+?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+new Chart(document.getElementById('mRevenueChart'), {
+    type: 'line',
+    data: {
+        labels: <?= json_encode($mChartDays) ?>,
+        datasets: [{
+            label: 'Net Revenue',
+            data: <?= json_encode($mChartRev) ?>,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.1)',
+            fill: true, tension: 0.4, borderWidth: 2, pointRadius: 3,
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => 'Rp ' + v.toLocaleString('id-ID') } }, x: { grid: { display: false } } }
+    }
+});
+new Chart(document.getElementById('mTxChart'), {
+    type: 'bar',
+    data: {
+        labels: <?= json_encode($mChartDays) ?>,
+        datasets: [{
+            label: 'Transaksi',
+            data: <?= json_encode($mChartCount) ?>,
+            backgroundColor: '#3b82f6',
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+    }
+});
+</script>
 <?php require_once __DIR__ . '/../includes/merchant_footer.php'; ?>

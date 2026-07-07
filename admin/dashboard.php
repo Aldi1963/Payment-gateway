@@ -101,6 +101,28 @@ require_once __DIR__ . '/../includes/admin_layout.php';
     </div>
 </div>
 
+<!-- Charts Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Revenue Chart (Last 7 days) -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-4">Revenue 7 Hari Terakhir</h3>
+        <canvas id="revenueChart" height="200"></canvas>
+    </div>
+    <!-- Transaction Status Breakdown -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-4">Status Transaksi</h3>
+        <canvas id="statusChart" height="200"></canvas>
+    </div>
+</div>
+
+<!-- Export Button -->
+<div class="flex justify-end mb-4">
+    <a href="/export.php?type=transactions&format=csv" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200 flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Export CSV
+    </a>
+</div>
+
 <!-- Recent Transactions -->
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -141,5 +163,94 @@ require_once __DIR__ . '/../includes/admin_layout.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php
+// Build chart data - last 7 days revenue
+$chartDays = [];
+$chartRevenue = [];
+$chartFee = [];
+$chartTxCount = [];
+for ($i = 6; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-{$i} days"));
+    $chartDays[] = date('d/m', strtotime($date));
+    $dayRevenue = 0;
+    $dayFee = 0;
+    $dayCount = 0;
+    foreach ($recentTx as $tx) {
+        if (substr($tx['created_at'] ?? '', 0, 10) === $date && ($tx['status'] ?? '') === 'PAID') {
+            $dayRevenue += $tx['amount'] ?? 0;
+            $dayFee += $tx['fee'] ?? 0;
+            $dayCount++;
+        }
+    }
+    $chartRevenue[] = $dayRevenue;
+    $chartFee[] = $dayFee;
+    $chartTxCount[] = $dayCount;
+}
+?>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Revenue Line Chart
+new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+        labels: <?= json_encode($chartDays) ?>,
+        datasets: [
+            {
+                label: 'Revenue',
+                data: <?= json_encode($chartRevenue) ?>,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37,99,235,0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 3,
+            },
+            {
+                label: 'Fee',
+                data: <?= json_encode($chartFee) ?>,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16,185,129,0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 3,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+        scales: {
+            y: { beginAtZero: true, ticks: { callback: v => 'Rp ' + v.toLocaleString('id-ID') } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// Status Doughnut Chart
+new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Paid', 'Pending', 'Failed', 'Expired'],
+        datasets: [{
+            data: [<?= $stats['paid_count'] ?>, <?= $stats['pending_count'] ?>, <?= $stats['failed_count'] ?>, <?= ($stats['total_transactions'] - $stats['paid_count'] - $stats['pending_count'] - $stats['failed_count']) ?>],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#94a3b8'],
+            borderWidth: 0,
+            hoverOffset: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } }
+        },
+        cutout: '65%',
+    }
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/admin_footer.php'; ?>
