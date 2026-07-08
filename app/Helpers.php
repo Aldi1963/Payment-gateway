@@ -543,3 +543,79 @@ function validate_webhook_url(string $url): array
 
     return ['safe' => true, 'reason' => ''];
 }
+
+
+
+/**
+ * Public-facing list of accepted payment methods, driven by admin toggles.
+ *
+ * The list follows what is enabled in the admin panel (Settings > Gateway):
+ * - QRIS is always available (primary AldiQRIS provider).
+ * - Virtual Account banks + E-Wallets appear when enabled either via the
+ *   Midtrans provider method toggles (midtrans_{method}_enabled while
+ *   channel_midtrans_enabled is on) OR via the standalone VA / E-Wallet
+ *   channel toggles (channel_va_enabled + va_{bank}_enabled, etc.).
+ *
+ * @return array<int,array{group:string,code:string,name:string}>
+ */
+function public_payment_methods(): array
+{
+    $methods = [];
+    $add = function (string $group, string $code, string $name) use (&$methods): void {
+        foreach ($methods as $m) {
+            if ($m['code'] === $code) return; // dedupe by logo code
+        }
+        $methods[] = ['group' => $group, 'code' => $code, 'name' => $name];
+    };
+
+    // QRIS — primary provider, always accepted
+    $add('QRIS', 'qris', 'QRIS');
+
+    $midtransOn = setting('channel_midtrans_enabled', '0') === '1';
+
+    // Virtual Account banks: [logo code => [display name, midtrans setting key]]
+    $vaBanks = [
+        'bca'     => ['BCA', 'bca_va'],
+        'bni'     => ['BNI', 'bni_va'],
+        'bri'     => ['BRI', 'bri_va'],
+        'mandiri' => ['Mandiri', 'mandiri_bill'],
+        'permata' => ['Permata', 'permata_va'],
+        'cimb'    => ['CIMB Niaga', 'cimb_va'],
+    ];
+    foreach ($vaBanks as $icon => [$name, $mtKey]) {
+        $viaMidtrans = $midtransOn && setting("midtrans_{$mtKey}_enabled", '1') === '1';
+        $viaVaChannel = setting('channel_va_enabled', '0') === '1' && setting("va_{$icon}_enabled", '0') === '1';
+        if ($viaMidtrans || $viaVaChannel) {
+            $add('Virtual Account', $icon, "{$name} Virtual Account");
+        }
+    }
+
+    // E-Wallets: [logo code => [display name, midtrans setting key|null]]
+    $wallets = [
+        'gopay'     => ['GoPay', 'gopay'],
+        'shopeepay' => ['ShopeePay', 'shopeepay'],
+        'ovo'       => ['OVO', null],
+        'dana'      => ['DANA', null],
+        'linkaja'   => ['LinkAja', null],
+    ];
+    foreach ($wallets as $icon => [$name, $mtKey]) {
+        $viaMidtrans = $mtKey !== null && $midtransOn && setting("midtrans_{$mtKey}_enabled", '1') === '1';
+        $viaEwallet = setting('channel_ewallet_enabled', '0') === '1' && setting("ewallet_{$icon}_enabled", '0') === '1';
+        if ($viaMidtrans || $viaEwallet) {
+            $add('E-Wallet', $icon, $name);
+        }
+    }
+
+    return $methods;
+}
+
+/**
+ * Resolve the logo asset path for a payment method code.
+ * Files live in /assets/img/payments/{code}.svg — drop-in replaceable
+ * with real PNG/SVG logos of the same base name.
+ */
+function payment_logo(string $code): string
+{
+    $safe = preg_replace('/[^a-z0-9]/', '', strtolower($code));
+    return '/assets/img/payments/' . $safe . '.svg';
+}

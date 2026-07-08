@@ -10,6 +10,13 @@ if (Auth::check()) {
     }
 }
 $appName = setting('app_name', 'Clipku Pay');
+
+// Payment methods to advertise — follows admin panel toggles (Settings > Gateway)
+$payMethods = public_payment_methods();
+$payGroups = [];
+foreach ($payMethods as $m) {
+    $payGroups[$m['group']][] = $m;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
@@ -35,6 +42,7 @@ $appName = setting('app_name', 'Clipku Pay');
         </div>
         <div class="hidden sm:flex items-center gap-6">
             <a href="#features" class="text-sm text-slate-600 hover:text-blue-600 transition-colors">Fitur</a>
+            <a href="#metode" class="text-sm text-slate-600 hover:text-blue-600 transition-colors">Metode Bayar</a>
             <a href="#pricing" class="text-sm text-slate-600 hover:text-blue-600 transition-colors">Harga</a>
             <a href="/docs.php" class="text-sm text-slate-600 hover:text-blue-600 transition-colors">API Docs</a>
         </div>
@@ -57,7 +65,7 @@ $appName = setting('app_name', 'Clipku Pay');
     <div class="max-w-5xl mx-auto text-center">
         <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 mb-6">
             <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-            <span class="text-xs font-medium text-blue-700">QRIS Payment Gateway Indonesia</span>
+            <span class="text-xs font-medium text-blue-700">Payment Gateway Indonesia</span>
         </div>
         
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
@@ -66,7 +74,7 @@ $appName = setting('app_name', 'Clipku Pay');
         </h1>
         
         <p class="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Platform payment gateway self-hosted untuk bisnis Indonesia. Integrasi QRIS, kelola multi merchant, dan pantau transaksi real-time.
+            Platform payment gateway self-hosted untuk bisnis Indonesia. Terima QRIS, Virtual Account bank, dan e-wallet, kelola multi merchant, dan pantau transaksi real-time.
         </p>
         
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -153,6 +161,56 @@ $appName = setting('app_name', 'Clipku Pay');
                 <p class="text-sm text-slate-600">API sederhana untuk integrasi ke website, aplikasi, atau sistem apapun dalam hitungan menit.</p>
             </div>
         </div>
+    </div>
+</section>
+
+
+<!-- Payment Methods Section (driven by admin panel toggles) -->
+<section id="metode" class="py-20 px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-14">
+            <div class="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-4 py-1.5 mb-4">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                <span class="text-xs font-medium text-emerald-700">Metode Pembayaran</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-4">Terima Semua Metode Populer</h2>
+            <p class="text-slate-600 max-w-xl mx-auto">QRIS, Virtual Account bank, dan e-wallet dalam satu platform. Daftar metode di bawah mengikuti yang diaktifkan di panel admin.</p>
+        </div>
+
+        <?php if (empty($payMethods)): ?>
+        <p class="text-center text-slate-400 text-sm">Belum ada metode pembayaran yang diaktifkan.</p>
+        <?php else: ?>
+        <div class="space-y-6">
+            <?php
+            $groupMeta = [
+                'QRIS'            => ['desc' => 'Satu QR untuk semua bank & e-wallet'],
+                'Virtual Account' => ['desc' => 'Transfer bank otomatis & terverifikasi'],
+                'E-Wallet'        => ['desc' => 'Bayar langsung dari dompet digital'],
+            ];
+            foreach ($groupMeta as $gkey => $meta):
+                if (empty($payGroups[$gkey])) continue;
+            ?>
+            <div class="bg-slate-50 rounded-2xl border border-slate-200 p-6 sm:p-8">
+                <div class="flex items-center justify-between gap-3 mb-5">
+                    <div class="min-w-0">
+                        <h3 class="text-lg font-bold text-slate-800"><?= e($gkey) ?></h3>
+                        <p class="text-sm text-slate-500"><?= e($meta['desc']) ?></p>
+                    </div>
+                    <span class="flex-shrink-0 text-xs font-medium text-slate-400"><?= count($payGroups[$gkey]) ?> metode</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <?php foreach ($payGroups[$gkey] as $m): ?>
+                    <div class="bg-white rounded-xl border border-slate-200 h-16 flex items-center justify-center px-4 hover:shadow-md hover:border-blue-300 transition-all" title="<?= e($m['name']) ?>">
+                        <img src="<?= e(payment_logo($m['code'])) ?>" alt="<?= e($m['name']) ?>" class="max-h-8 w-auto object-contain" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+                        <span class="hidden text-sm font-bold text-slate-700"><?= e($m['name']) ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <p class="text-center text-xs text-slate-400 mt-6">Metode pembayaran dapat diaktifkan/nonaktifkan oleh admin di <span class="font-medium">Settings &rsaquo; Gateway</span>.</p>
+        <?php endif; ?>
     </div>
 </section>
 
