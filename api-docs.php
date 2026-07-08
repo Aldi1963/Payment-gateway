@@ -80,17 +80,17 @@ $appUrl = setting('app_url', app_url(''));
         <h2 class="text-xl font-bold text-slate-800 mb-4">Payment Method Codes</h2>
         <p class="text-sm text-slate-500 mb-4">Kosongkan <code class="bg-slate-200 px-1 rounded text-xs">payment_channel</code> agar customer memilih sendiri di halaman checkout, atau tentukan salah satu:</p>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left">Channel</th><th class="px-3 py-2 text-left">Metode</th></tr></thead><tbody>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS</td><td class="px-3 py-2 text-xs">qris</td><td class="px-3 py-2 text-xs">QRIS (AldiQRIS)</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BCAVA</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BCA</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BNIVA</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BNI</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BRIVA</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BRI</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">PERMATAVA</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA Permata</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">CIMBVA</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA CIMB</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MANDIRI</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">Mandiri Bill</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MTQRIS</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">QRIS (Midtrans)</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">GOPAY</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">GoPay</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">SHOPEEPAY</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">ShopeePay</td></tr>
+            <table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left">Metode</th><th class="px-3 py-2 text-left">Tampilan</th></tr></thead><tbody>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS</td><td class="px-3 py-2 text-xs">QRIS (AldiQRIS)</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BCAVA</td><td class="px-3 py-2 text-xs">VA BCA</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BNIVA</td><td class="px-3 py-2 text-xs">VA BNI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BRIVA</td><td class="px-3 py-2 text-xs">VA BRI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">PERMATAVA</td><td class="px-3 py-2 text-xs">VA Permata</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">CIMBVA</td><td class="px-3 py-2 text-xs">VA CIMB</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MANDIRI</td><td class="px-3 py-2 text-xs">Mandiri Bill</td><td class="px-3 py-2 text-xs">Bill Key</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MTQRIS</td><td class="px-3 py-2 text-xs">QRIS (Midtrans)</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">GOPAY</td><td class="px-3 py-2 text-xs">GoPay</td><td class="px-3 py-2 text-xs">QR + Deeplink</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">SHOPEEPAY</td><td class="px-3 py-2 text-xs">ShopeePay</td><td class="px-3 py-2 text-xs">Deeplink</td></tr>
             </tbody></table>
         </div>
     </div>
