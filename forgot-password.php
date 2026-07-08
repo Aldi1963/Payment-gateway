@@ -12,6 +12,12 @@ if (Auth::check()) {
 // Handle POST - send reset email
 if (is_post()) {
     Auth::verifyCsrf();
+    
+    require_once base_path('includes/turnstile.php');
+    if (!turnstile_verify()) {
+        flash('error', 'Verifikasi captcha gagal. Silakan coba lagi.');
+        redirect('/forgot-password.php');
+    }
     $email = sanitize($_POST['email'] ?? '');
     
     if (empty($email) || !is_valid_email($email)) {
@@ -43,6 +49,7 @@ if (is_post()) {
 }
 
 $appName = setting('app_name', 'Clipku Pay');
+require_once base_path('includes/turnstile.php');
 $flashes = get_flash();
 ?>
 <!DOCTYPE html>
@@ -55,6 +62,7 @@ $flashes = get_flash();
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+    <?= turnstile_script() ?>
 </head>
 <body class="h-full font-sans antialiased bg-slate-50 flex items-center justify-center p-4">
 
@@ -108,6 +116,8 @@ $flashes = get_flash();
                         placeholder="email@contoh.com">
                 </div>
             </div>
+
+            <?= turnstile_widget() ?>
 
             <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-blue-500/25">
                 Kirim Link Reset

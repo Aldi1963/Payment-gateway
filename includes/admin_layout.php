@@ -57,9 +57,14 @@ if ($userRole === 'finance') {
 
         <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
             <div class="flex items-center gap-3">
+                <?php $avatarUrl = $_SESSION['user_avatar'] ?? ''; ?>
+                <?php if (!empty($avatarUrl)): ?>
+                <img src="<?= e($avatarUrl) ?>" alt="" class="w-8 h-8 rounded-full object-cover ring-2 ring-slate-600">
+                <?php else: ?>
                 <div class="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center text-sm font-bold">
                     <?= strtoupper(substr($userName, 0, 1)) ?>
                 </div>
+                <?php endif; ?>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate"><?= e($userName) ?></p>
                     <p class="text-xs text-slate-400"><?= ucfirst(str_replace('_', ' ', $userRole)) ?></p>

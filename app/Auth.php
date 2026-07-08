@@ -88,6 +88,7 @@ class Auth
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['merchant_id'] = $user['merchant_id'] ?? null;
         $_SESSION['permissions'] = $user['permissions'] ?? [];
+        $_SESSION['user_avatar'] = $user['avatar_url'] ?? '';
         $_SESSION['logged_in_at'] = time();
         $_SESSION['_fingerprint'] = self::generateFingerprint();
         $_SESSION['_login_ip'] = self::getTrustedClientIp();
@@ -96,6 +97,25 @@ class Auth
         $userRepo->update($user['id'], ['last_login_at' => now()]);
         
         return ['success' => true, 'user' => $user];
+    }
+
+    /**
+     * Login user directly (for OAuth/social login)
+     * Sets session without password verification
+     */
+    public static function loginUser(array $user): void
+    {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_role'] = $user['role'] ?? 'merchant';
+        $_SESSION['user_email'] = $user['email'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['merchant_id'] = $user['merchant_id'] ?? null;
+        $_SESSION['permissions'] = $user['permissions'] ?? [];
+        $_SESSION['user_avatar'] = $user['avatar_url'] ?? '';
+        $_SESSION['logged_in_at'] = time();
+        $_SESSION['_fingerprint'] = self::generateFingerprint();
+        $_SESSION['_login_ip'] = self::getTrustedClientIp();
     }
 
     /**
