@@ -17,6 +17,23 @@ $payGroups = [];
 foreach ($payMethods as $m) {
     $payGroups[$m['group']][] = $m;
 }
+
+// Pricing/fee — follows admin panel fee settings (Settings > Fee & Transaksi)
+$feeType  = setting('default_fee_type', 'percentage');
+$feeValue = (float) setting('default_fee_value', 0.7);
+$feeFlat  = (float) setting('default_fee_flat', 0);
+$feePct   = rtrim(rtrim(number_format($feeValue, 2, ',', '.'), '0'), ',') . '%';
+if ($feeType === 'flat') {
+    $feeMain = format_currency($feeFlat);
+    $feeSub  = 'Biaya tetap per transaksi berhasil';
+} elseif ($feeType === 'hybrid') {
+    $feeMain = $feePct;
+    $feeSub  = '+ ' . format_currency($feeFlat) . ' per transaksi';
+} else { // percentage
+    $feeMain = $feePct;
+    $feeSub  = $feeFlat > 0 ? '+ ' . format_currency($feeFlat) . ' flat' : 'Tanpa biaya flat tambahan';
+}
+$minTrx = (int) setting('min_transaction_amount', 1000);
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
@@ -229,8 +246,8 @@ foreach ($payMethods as $m) {
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
                     <div>
                         <p class="text-blue-200 text-sm font-medium mb-2">Per Transaksi Berhasil</p>
-                        <p class="text-5xl font-extrabold">0.7%</p>
-                        <p class="text-blue-200 text-sm mt-2">Minimum Rp 0 flat fee</p>
+                        <p class="text-5xl font-extrabold"><?= e($feeMain) ?></p>
+                        <p class="text-blue-200 text-sm mt-2"><?= e($feeSub) ?></p>
                     </div>
                     <div class="space-y-3">
                         <div class="flex items-center gap-2"><svg class="w-5 h-5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg><span class="text-sm">Unlimited transaksi</span></div>
