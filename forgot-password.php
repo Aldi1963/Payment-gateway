@@ -39,8 +39,11 @@ if (is_post()) {
             'verify_token_at' => now(),
         ]);
         
-        // In production: send email with reset link
-        // EmailService::sendResetLink($email, $token);
+        // Send reset email
+        require_once base_path('app/Services/EmailService.php');
+        $emailService = new EmailService();
+        $emailService->sendPasswordReset($email, $user['name'] ?? 'User', $token);
+        
         app_log("Password reset requested for: {$email}", 'INFO');
     }
     

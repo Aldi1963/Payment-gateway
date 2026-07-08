@@ -353,9 +353,12 @@ class TransactionService
 
         $this->transactionRepo->update($transaction['id'], $updates);
 
-        // If paid, credit wallet
+        // If paid, credit wallet and send notifications
         if ($newStatus === 'PAID' && $oldStatus !== 'PAID') {
             $this->walletService->creditTransaction($transaction);
+            
+            // Send notifications (email + WA)
+            $this->sendPaymentNotifications($transaction);
         }
 
         // Audit log
@@ -369,6 +372,47 @@ class TransactionService
         );
 
         return true;
+    }
+
+    /**
+     * Send payment notifications to merchant (email + WA)
+     */
+    private function sendPaymentNotifications(array $transaction): void
+    {
+        try {
+            $merchant = $this->merchantRepo->find($transaction['merchant_id']);
+            if (!$merchant) return;
+
+            // Email notification
+            if (setting('notif_on_payment', '0') === '1' || ($merchant['notif_email_payment'] ?? '0') === '1') {
+                $notifEmail = $merchant['notif_email_payment'] ?? $merchant['email'] ?? '';
+                if (!empty($notifEmail) && $notifEmail !== '0' && $notifEmail !== '1') {
+                    // Use merchant email
+                    $emailTo = $notifEmail;
+                } else {
+                    $emailTo = $merchant['email'] ?? '';
+                }
+                if (!empty($emailTo) && is_valid_email($emailTo)) {
+                    require_once base_path('app/Services/EmailService.php');
+                    $emailService = new EmailService();
+                    $emailService->sendPaymentNotification($emailTo, $transaction);
+                }
+            }
+
+            // WhatsApp notification
+            if (setting('notif_wa_enabled', '0') === '1' && ($merchant['notif_wa_payment'] ?? '0') === '1') {
+                $waNumber = $merchant['notif_wa_number'] ?? $merchant['phone'] ?? '';
+                if (!empty($waNumber)) {
+                    require_once base_path('app/Services/NotificationService.php');
+                    $notifService = new NotificationService();
+                    $notifService->sendWhatsApp($waNumber, 
+                        "Pembayaran masuk! Order: {$transaction['order_id']}, Amount: " . format_currency($transaction['amount'])
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            app_log("Notification error: " . $e->getMessage(), 'ERROR');
+        }
     }
 
     /**

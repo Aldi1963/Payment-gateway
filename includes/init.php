@@ -45,6 +45,19 @@ try {
 // Initialize session
 Auth::init();
 
+// Force HTTPS redirect (if enabled in settings)
+if (setting('force_https', '0') === '1') {
+    if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off') {
+        $isApi = str_contains($_SERVER['PHP_SELF'] ?? '', 'api/');
+        $isCron = str_contains($_SERVER['PHP_SELF'] ?? '', 'cron.php');
+        if (!$isApi && !$isCron) {
+            $redirectUrl = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($_SERVER['REQUEST_URI'] ?? '/');
+            header('Location: ' . $redirectUrl, true, 301);
+            exit;
+        }
+    }
+}
+
 // Validate session fingerprint (anti-hijacking)
 if (!Auth::validateSession()) {
     // Session was invalidated - redirect to login

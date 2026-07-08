@@ -8,15 +8,12 @@ $userRole = $_SESSION['user_role'] ?? 'admin';
 
 $adminMenus = [
     ['url' => '/admin/dashboard.php', 'icon' => 'dashboard', 'label' => 'Dashboard', 'page' => 'dashboard'],
-    ['url' => '/admin/users.php', 'icon' => 'users', 'label' => 'Users', 'page' => 'users'],
     ['url' => '/admin/merchants.php', 'icon' => 'store', 'label' => 'Merchants', 'page' => 'merchants'],
     ['url' => '/admin/transactions.php', 'icon' => 'receipt', 'label' => 'Transaksi', 'page' => 'transactions'],
+    ['url' => '/admin/withdrawals.php', 'icon' => 'wallet', 'label' => 'Dana', 'page' => 'withdrawals'],
     ['url' => '/admin/fee-management.php', 'icon' => 'fee', 'label' => 'Fee Engine', 'page' => 'fee-management'],
-    ['url' => '/admin/config-changes.php', 'icon' => 'shield', 'label' => 'Config Verify', 'page' => 'config-changes'],
-    ['url' => '/admin/withdrawals.php', 'icon' => 'wallet', 'label' => 'Withdrawals', 'page' => 'withdrawals'],
-    ['url' => '/admin/settlements.php', 'icon' => 'bank', 'label' => 'Settlements', 'page' => 'settlements'],
-    ['url' => '/admin/webhook-logs.php', 'icon' => 'webhook', 'label' => 'Webhook Logs', 'page' => 'webhook-logs'],
-    ['url' => '/admin/audit-logs.php', 'icon' => 'audit', 'label' => 'Audit Logs', 'page' => 'audit-logs'],
+    ['url' => '/admin/audit-logs.php', 'icon' => 'audit', 'label' => 'Log & Verifikasi', 'page' => 'audit-logs'],
+    ['url' => '/admin/users.php', 'icon' => 'users', 'label' => 'Users', 'page' => 'users'],
     ['url' => '/admin/settings.php', 'icon' => 'settings', 'label' => 'Settings', 'page' => 'settings'],
 ];
 

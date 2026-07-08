@@ -88,6 +88,13 @@ if (is_post()) {
         $settingRepo->set('google_client_secret', $_POST['google_client_secret'] ?? '');
         $settingRepo->set('google_redirect_uri', sanitize($_POST['google_redirect_uri'] ?? ''));
     } elseif ($tab === 'notifications') {
+        // SMTP Settings
+        $settingRepo->set('smtp_host', sanitize($_POST['smtp_host'] ?? ''));
+        $settingRepo->set('smtp_port', (int)($_POST['smtp_port'] ?? 587));
+        $settingRepo->set('smtp_username', sanitize($_POST['smtp_username'] ?? ''));
+        $settingRepo->set('smtp_password', $_POST['smtp_password'] ?? '');
+        $settingRepo->set('smtp_encryption', sanitize($_POST['smtp_encryption'] ?? 'tls'));
+        
         $settingRepo->set('notif_email_enabled', isset($_POST['notif_email_enabled']) ? '1' : '0');
         $settingRepo->set('notif_email_from', sanitize($_POST['notif_email_from'] ?? ''));
         $settingRepo->set('notif_wa_enabled', isset($_POST['notif_wa_enabled']) ? '1' : '0');
@@ -585,6 +592,38 @@ echo e(is_array($bankList) ? implode("\n", $bankList) : $bankList);
 <form method="POST" class="space-y-5">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="notifications">
+    
+    <!-- SMTP Configuration -->
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+        <p class="text-sm font-medium text-slate-700 mb-3">SMTP Email Server</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">SMTP Host</label>
+                <input type="text" name="smtp_host" value="<?= e($s['smtp_host'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="smtp.gmail.com">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Port</label>
+                <input type="number" name="smtp_port" value="<?= e($s['smtp_port'] ?? 587) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Username</label>
+                <input type="text" name="smtp_username" value="<?= e($s['smtp_username'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="user@gmail.com">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Password</label>
+                <input type="password" name="smtp_password" value="<?= e($s['smtp_password'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="block text-xs text-slate-500 mb-1">Encryption</label>
+            <select name="smtp_encryption" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <option value="tls" <?= ($s['smtp_encryption'] ?? 'tls') === 'tls' ? 'selected' : '' ?>>TLS (Port 587)</option>
+                <option value="ssl" <?= ($s['smtp_encryption'] ?? '') === 'ssl' ? 'selected' : '' ?>>SSL (Port 465)</option>
+                <option value="" <?= ($s['smtp_encryption'] ?? 'tls') === '' ? 'selected' : '' ?>>None (Port 25)</option>
+            </select>
+        </div>
+    </div>
+
     <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <p class="text-sm font-medium text-slate-700 mb-3">Email Notification</p>
         <label class="flex items-center gap-2 cursor-pointer mb-3">

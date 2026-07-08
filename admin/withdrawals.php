@@ -20,10 +20,18 @@ if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
 $withdrawals = $controller->withdrawals($filters);
 $pagination = paginate($withdrawals, (int)($_GET['page'] ?? 1));
 
-$pageTitle = 'Withdrawals';
+$pageTitle = 'Dana';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
+
+<!-- Tab Navigation: Withdrawals | Settlements -->
+<div class="border-b border-slate-200 mb-6">
+    <nav class="flex gap-1 -mb-px overflow-x-auto">
+        <a href="/admin/withdrawals.php" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-blue-600 text-blue-600">Withdrawals</a>
+        <a href="/admin/settlements.php" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300">Settlements</a>
+    </nav>
+</div>
 
 <div class="flex items-center justify-between mb-6">
     <form method="GET" class="flex items-center gap-2">

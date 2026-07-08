@@ -7,10 +7,19 @@ $controller = new AdminController();
 $logs = $controller->auditLogs();
 $pagination = paginate($logs, (int)($_GET['page'] ?? 1), 30);
 
-$pageTitle = 'Audit Logs';
+$pageTitle = 'Log & Verifikasi';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
+
+<!-- Tab Navigation: Audit | Webhook Logs | Config Verify -->
+<div class="border-b border-slate-200 mb-6">
+    <nav class="flex gap-1 -mb-px overflow-x-auto">
+        <a href="/admin/audit-logs.php" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-blue-600 text-blue-600">Audit Logs</a>
+        <a href="/admin/webhook-logs.php" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300">Webhook Logs</a>
+        <a href="/admin/config-changes.php" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300">Config Verify</a>
+    </nav>
+</div>
 
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
     <?php if (empty($pagination['data'])): ?>

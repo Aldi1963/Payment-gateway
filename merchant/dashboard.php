@@ -133,13 +133,14 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 </div>
 
 <?php
-// Chart data - last 7 days
+// Chart data - last 7 days (use ALL transactions from the controller, not just recent)
+$allTxForChart = $controller->transactions([]);
 $mChartDays = []; $mChartRev = []; $mChartCount = [];
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));
     $mChartDays[] = date('d/m', strtotime($date));
     $dayRev = 0; $dayCnt = 0;
-    foreach ($recentTx as $tx) {
+    foreach ($allTxForChart as $tx) {
         if (substr($tx['created_at'] ?? '', 0, 10) === $date) {
             $dayCnt++;
             if (($tx['status'] ?? '') === 'PAID') $dayRev += $tx['net_amount'] ?? 0;

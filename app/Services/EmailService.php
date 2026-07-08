@@ -49,6 +49,31 @@ class EmailService
     }
 
     /**
+     * Send password reset email
+     */
+    public function sendPasswordReset(string $to, string $name, string $token): bool
+    {
+        $appUrl = setting('app_url', app_url(''));
+        $resetUrl = rtrim($appUrl, '/') . '/reset-password.php?token=' . urlencode($token) . '&email=' . urlencode($to);
+        
+        $subject = "Reset Password - {$this->fromName}";
+        $body = $this->buildHtml("
+            <h2>Reset Password</h2>
+            <p>Halo " . e($name) . ",</p>
+            <p>Anda menerima email ini karena ada permintaan reset password untuk akun Anda.</p>
+            <p style='text-align:center;margin:30px 0'>
+                <a href='{$resetUrl}' style='background:#2563eb;color:#fff;padding:12px 30px;text-decoration:none;border-radius:8px;font-weight:600'>
+                    Reset Password
+                </a>
+            </p>
+            <p style='font-size:12px;color:#64748b'>Atau copy link ini: {$resetUrl}</p>
+            <p style='font-size:12px;color:#94a3b8'>Link berlaku 1 jam. Abaikan email ini jika Anda tidak meminta reset password.</p>
+        ");
+
+        return $this->send($to, $subject, $body);
+    }
+
+    /**
      * Send payment notification to merchant
      */
     public function sendPaymentNotification(string $to, array $transaction): bool
@@ -101,19 +126,31 @@ class EmailService
 
     /**
      * Send generic email
+     * Uses SMTP if configured, falls back to PHP mail()
      */
     public function send(string $to, string $subject, string $htmlBody): bool
     {
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/html; charset=UTF-8',
-            "From: {$this->fromName} <{$this->fromEmail}>",
-            "Reply-To: {$this->fromEmail}",
-            'X-Mailer: ClipkuPay/1.0',
-        ];
+        $smtpHost = setting('smtp_host', '');
+        $smtpPort = (int)setting('smtp_port', 587);
+        $smtpUser = setting('smtp_username', '');
+        $smtpPass = setting('smtp_password', '');
+        $smtpEncryption = setting('smtp_encryption', 'tls'); // tls, ssl, or empty
 
-        $result = @mail($to, $subject, $htmlBody, implode("\r\n", $headers));
-        
+        // Use SMTP if configured
+        if (!empty($smtpHost) && !empty($smtpUser)) {
+            $result = $this->sendViaSMTP($to, $subject, $htmlBody, $smtpHost, $smtpPort, $smtpUser, $smtpPass, $smtpEncryption);
+        } else {
+            // Fallback to PHP mail()
+            $headers = [
+                'MIME-Version: 1.0',
+                'Content-Type: text/html; charset=UTF-8',
+                "From: {$this->fromName} <{$this->fromEmail}>",
+                "Reply-To: {$this->fromEmail}",
+                'X-Mailer: ClipkuPay/1.0',
+            ];
+            $result = @mail($to, $subject, $htmlBody, implode("\r\n", $headers));
+        }
+
         if ($result) {
             app_log("Email sent to {$to}: {$subject}", 'INFO');
         } else {
@@ -121,6 +158,77 @@ class EmailService
         }
 
         return $result;
+    }
+
+    /**
+     * Send email via SMTP directly (no external library needed)
+     */
+    private function sendViaSMTP(string $to, string $subject, string $body, string $host, int $port, string $user, string $pass, string $encryption): bool
+    {
+        try {
+            $prefix = ($encryption === 'ssl') ? 'ssl://' : '';
+            $socket = @stream_socket_client("{$prefix}{$host}:{$port}", $errno, $errstr, 10);
+            if (!$socket) {
+                app_log("SMTP connection failed: {$errstr} ({$errno})", 'ERROR');
+                return false;
+            }
+
+            $this->smtpRead($socket);
+            $this->smtpSend($socket, "EHLO " . gethostname());
+
+            // STARTTLS for TLS encryption
+            if ($encryption === 'tls') {
+                $this->smtpSend($socket, "STARTTLS");
+                stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);
+                $this->smtpSend($socket, "EHLO " . gethostname());
+            }
+
+            // Authentication
+            $this->smtpSend($socket, "AUTH LOGIN");
+            $this->smtpSend($socket, base64_encode($user));
+            $this->smtpSend($socket, base64_encode($pass));
+
+            // Envelope
+            $this->smtpSend($socket, "MAIL FROM:<{$this->fromEmail}>");
+            $this->smtpSend($socket, "RCPT TO:<{$to}>");
+            $this->smtpSend($socket, "DATA");
+
+            // Headers + Body
+            $message = "From: {$this->fromName} <{$this->fromEmail}>\r\n";
+            $message .= "To: {$to}\r\n";
+            $message .= "Subject: {$subject}\r\n";
+            $message .= "MIME-Version: 1.0\r\n";
+            $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $message .= "X-Mailer: ClipkuPay/1.0\r\n";
+            $message .= "\r\n";
+            $message .= $body;
+            $message .= "\r\n.";
+            
+            $this->smtpSend($socket, $message);
+            $this->smtpSend($socket, "QUIT");
+            fclose($socket);
+
+            return true;
+        } catch (\Throwable $e) {
+            app_log("SMTP error: " . $e->getMessage(), 'ERROR');
+            return false;
+        }
+    }
+
+    private function smtpSend($socket, string $command): string
+    {
+        fwrite($socket, $command . "\r\n");
+        return $this->smtpRead($socket);
+    }
+
+    private function smtpRead($socket): string
+    {
+        $response = '';
+        while ($line = fgets($socket, 515)) {
+            $response .= $line;
+            if (substr($line, 3, 1) === ' ') break;
+        }
+        return $response;
     }
 
     /**

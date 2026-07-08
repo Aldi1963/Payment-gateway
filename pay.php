@@ -350,6 +350,10 @@ $paymentType = $midtransMeta['payment_type'] ?? ($transaction['payment_channel']
             <div class="flex items-center justify-center gap-3 mt-2">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/QRIS_logo.svg/120px-QRIS_logo.svg.png" alt="QRIS" class="h-5">
             </div>
+            <a href="<?= e($imgSrc) ?>" download="QRIS-<?= e($transaction['order_id']) ?>.png" class="inline-flex items-center gap-1 mt-3 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Download QR
+            </a>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
             <p class="text-sm font-medium text-slate-700 mb-2">Cara Pembayaran:</p>
