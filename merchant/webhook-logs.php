@@ -73,7 +73,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     </div>
     <div class="flex items-center gap-3">
         <a href="/merchant/integration.php?tab=test" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Test Webhook</a>
-        <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=webhook" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 whitespace-nowrap">Webhook Settings</a>
+        <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 whitespace-nowrap">Webhook Settings</a>
     </div>
 </div>
 

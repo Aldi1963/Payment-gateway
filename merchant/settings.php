@@ -9,16 +9,18 @@ Auth::requireMerchant();
 require_once base_path('app/Repositories/MerchantRepository.php');
 require_once base_path('app/Repositories/UserRepository.php');
 require_once base_path('app/Services/AuditLogService.php');
+require_once base_path('app/Services/ConfigChangeService.php');
 
 $merchantRepo = new MerchantRepository();
 $userRepo = new UserRepository();
 $auditService = new AuditLogService();
+$configService = new ConfigChangeService();
 $merchantId = Auth::merchantId();
 $merchant = $merchantRepo->find($merchantId);
 $user = $userRepo->find(Auth::id());
 
 $activeTab = $_GET['tab'] ?? 'profile';
-$validTabs = ['profile', 'business', 'bank', 'payment', 'notifications', 'whatsapp', 'password'];
+$validTabs = ['profile', 'business', 'bank', 'apikey', 'payment', 'notifications', 'whatsapp', 'password'];
 if (!in_array($activeTab, $validTabs)) $activeTab = 'profile';
 
 require_once base_path('app/Controllers/MerchantController.php');
@@ -62,6 +64,31 @@ if (is_post()) {
             'updated_at' => now(),
         ]);
         flash('success', 'Informasi bank berhasil disimpan.');
+
+    } elseif ($tab === 'apikey') {
+        if (($_POST['_action'] ?? '') === 'regenerate') {
+            $password = $_POST['confirm_password'] ?? '';
+            if (!$configService->verifyPassword(Auth::id(), $password)) {
+                flash('error', 'Password tidak valid. Verifikasi gagal.');
+                redirect('/merchant/settings.php?tab=apikey');
+            }
+            $requireApproval = setting('require_approval_api_key', '1') === '1';
+            if ($requireApproval) {
+                $result = $configService->requestChange([
+                    'merchant_id' => $merchantId,
+                    'change_type' => 'api_key_regenerate',
+                    'old_value' => mask_api_key($merchant['api_key'] ?? ''),
+                    'new_value' => '(akan di-generate otomatis setelah approved)',
+                    'reason' => sanitize($_POST['reason'] ?? 'Regenerate API Key'),
+                    'requested_by' => Auth::id(),
+                    'requested_by_role' => Auth::role(),
+                ]);
+            } else {
+                $result = $merchantController->regenerateApiKey();
+            }
+            flash($result['success'] ? 'success' : 'error', $result['message']);
+        }
+        redirect('/merchant/settings.php?tab=apikey');
 
     } elseif ($tab === 'payment') {
         $merchantRepo->update($merchantId, [
@@ -125,6 +152,10 @@ $user = $userRepo->find(Auth::id());
 // WhatsApp config for the active project
 $waConfig = $merchantController->getWaConfig();
 
+// Pending API key regenerate status (for apikey tab)
+$pendingChanges = $configService->getPendingByMerchant($merchantId);
+$hasPendingKey = !empty(array_filter($pendingChanges, fn($c) => $c['change_type'] === 'api_key_regenerate'));
+
 // Bank list
 require_once base_path('app/Repositories/SettingRepository.php');
 $settingRepo = new SettingRepository();
@@ -144,6 +175,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
             'profile' => 'Profil',
             'business' => 'Bisnis',
             'bank' => 'Rekening Bank',
+            'apikey' => 'API Key',
             'payment' => 'Pembayaran',
             'notifications' => 'Notifikasi',
             'whatsapp' => 'Integrasi WhatsApp',
@@ -243,6 +275,56 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Rekening</button>
 </form>
 
+
+<?php elseif ($activeTab === 'apikey'): ?>
+<!-- ============ TAB: API KEY ============ -->
+<h3 class="text-lg font-semibold text-slate-800 mb-2">API Key</h3>
+<p class="text-sm text-slate-500 mb-4">API key untuk proyek aktif <strong><?= e($merchant['business_name'] ?? '') ?></strong>. Gunakan untuk autentikasi request API. <strong>Jangan bagikan ke pihak lain.</strong></p>
+
+<div class="flex items-center gap-2 mb-4">
+    <input type="text" id="apiKeyField" value="<?= e($merchant['api_key'] ?? '') ?>" readonly autocomplete="off" class="flex-1 px-4 py-3 bg-slate-900 text-emerald-400 font-mono text-sm rounded-lg border-0">
+    <button type="button" onclick="copyApiKey()" class="px-4 py-3 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">Copy</button>
+</div>
+<p class="text-xs text-slate-400 mb-4">Masked: <?= mask_api_key($merchant['api_key'] ?? '') ?></p>
+
+<div class="p-4 bg-slate-50 border border-slate-200 rounded-lg mb-6 text-sm space-y-2">
+    <div><span class="text-xs text-slate-500">Base URL:</span><code class="block mt-1 px-3 py-2 bg-white border border-slate-200 rounded text-xs font-mono"><?= e(app_url('api/v1/')) ?></code></div>
+    <div><span class="text-xs text-slate-500">Header:</span><code class="block mt-1 px-3 py-2 bg-white border border-slate-200 rounded text-xs font-mono">Authorization: Bearer YOUR_API_KEY</code></div>
+    <a href="/merchant/integration.php" class="inline-block text-xs text-blue-600 font-medium hover:text-blue-700">Lihat Dokumentasi Lengkap &rarr;</a>
+</div>
+
+<div class="pt-4 border-t border-slate-200">
+    <h4 class="text-sm font-semibold text-slate-800 mb-3">Regenerate API Key</h4>
+    <?php if ($hasPendingKey): ?>
+    <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <p class="text-xs text-amber-700 font-medium">Regenerasi API key sedang menunggu persetujuan admin.</p>
+    </div>
+    <?php else: ?>
+    <form method="POST" action="?tab=apikey" class="space-y-3 max-w-md">
+        <?= csrf_field() ?>
+        <input type="hidden" name="_tab" value="apikey">
+        <input type="hidden" name="_action" value="regenerate">
+        <div>
+            <label class="block text-xs text-slate-500 mb-1">Alasan <span class="text-slate-400">(opsional)</span></label>
+            <input type="text" name="reason" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" placeholder="Compromised, rotasi rutin, dll.">
+        </div>
+        <div>
+            <label class="block text-xs text-slate-500 mb-1">Konfirmasi Password <span class="text-red-500">*</span></label>
+            <input type="password" name="confirm_password" required autocomplete="off" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" placeholder="Masukkan password Anda">
+        </div>
+        <button type="submit" onclick="return confirm('API key lama tidak berlaku setelah disetujui. Lanjutkan?')" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 border border-red-200">
+            Ajukan Regenerate API Key
+        </button>
+    </form>
+    <?php endif; ?>
+</div>
+
+<script>
+function copyApiKey() {
+    var f = document.getElementById('apiKeyField');
+    navigator.clipboard.writeText(f.value).then(function(){ if (typeof showToast === 'function') showToast('API key disalin!'); });
+}
+</script>
 
 <?php elseif ($activeTab === 'payment'): ?>
 <!-- ============ TAB: PEMBAYARAN ============ -->

@@ -8,8 +8,8 @@
  * - Test webhook
  * - Webhook signature verification
  * 
- * Semua konfigurasi (API key, webhook URL, IP whitelist) diatur dari:
- * /merchant/project-settings.php
+ * Konfigurasi API key ada di /merchant/settings.php?tab=apikey
+ * Konfigurasi webhook URL & IP whitelist ada di /merchant/project-settings.php
  */
 require_once __DIR__ . '/../includes/init.php';
 Auth::requireMerchant();
@@ -95,7 +95,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <div class="flex items-start gap-3">
         <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <div>
-            <p class="text-sm text-blue-800">API Key, Webhook URL, dan IP Whitelist diatur dari <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=api" class="font-semibold underline hover:text-blue-900">Project Settings</a>.</p>
+            <p class="text-sm text-blue-800"><strong>API Key</strong> diatur di <a href="/merchant/settings.php?tab=apikey" class="font-semibold underline hover:text-blue-900">Pengaturan</a>. <strong>Webhook URL</strong> & <strong>IP Whitelist</strong> diatur di <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>" class="font-semibold underline hover:text-blue-900">Project Settings</a>.</p>
             <p class="text-xs text-blue-600 mt-1">Halaman ini berisi dokumentasi teknis dan testing untuk proyek aktif Anda.</p>
         </div>
     </div>
@@ -270,7 +270,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <div class="bg-white rounded-xl border border-slate-200 p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Cara Kerja Webhook</h3>
         <div class="text-sm text-slate-600 space-y-3">
-            <p>Webhook adalah notifikasi HTTP POST yang dikirim ke server Anda setiap kali terjadi event pembayaran. Sistem kami akan mengirimkan payload JSON ke Webhook URL yang telah Anda konfigurasi di <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=webhook" class="text-blue-600 font-medium hover:underline">Project Settings</a>.</p>
+            <p>Webhook adalah notifikasi HTTP POST yang dikirim ke server Anda setiap kali terjadi event pembayaran. Sistem kami akan mengirimkan payload JSON ke Webhook URL yang telah Anda konfigurasi di <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>" class="text-blue-600 font-medium hover:underline">Project Settings</a>.</p>
             <ol class="list-decimal list-inside space-y-2 ml-2">
                 <li>Customer melakukan pembayaran</li>
                 <li>Sistem memverifikasi pembayaran</li>
@@ -400,7 +400,7 @@ app.post('/webhook', (req, res) => {
 
         <?php if (empty($merchant['webhook_url'])): ?>
         <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            Webhook URL belum dikonfigurasi. <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=webhook" class="font-medium underline">Set webhook URL di Project Settings</a> terlebih dahulu.
+            Webhook URL belum dikonfigurasi. <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>" class="font-medium underline">Set webhook URL di Project Settings</a> terlebih dahulu.
         </div>
         <?php else: ?>
         <div class="p-3 bg-slate-50 rounded-lg mb-4">
