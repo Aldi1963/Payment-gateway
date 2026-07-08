@@ -54,9 +54,16 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <?php endif; ?>
 
     <?php if (!empty($tx['qr_url'])): ?>
+    <?php
+        $qrUrl = $tx['qr_url'];
+        $isRawQris = !str_starts_with($qrUrl, 'http');
+        $qrImgSrc = $isRawQris
+            ? 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($qrUrl)
+            : $qrUrl;
+    ?>
     <div class="bg-white rounded-xl border border-slate-200 p-6 mb-4">
         <h4 class="text-sm font-semibold text-slate-800 mb-3">QR Code</h4>
-        <img src="<?= e($tx['qr_url']) ?>" alt="QRIS" class="w-48 h-48 mx-auto border rounded-lg">
+        <img src="<?= e($qrImgSrc) ?>" alt="QRIS" class="w-48 h-48 mx-auto border rounded-lg">
     </div>
     <?php endif; ?>
 
