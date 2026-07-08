@@ -96,6 +96,10 @@ class PaymentChannelManager
         require_once base_path('app/Channels/QrisChannel.php');
         $this->register('qris', new QrisChannel());
 
+        // Midtrans (if configured)
+        require_once base_path('app/Channels/MidtransChannel.php');
+        $this->register('midtrans', new MidtransChannel());
+
         // Virtual Account (if configured)
         require_once base_path('app/Channels/VirtualAccountChannel.php');
         $this->register('va', new VirtualAccountChannel());
