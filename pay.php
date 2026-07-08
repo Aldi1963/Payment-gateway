@@ -157,18 +157,39 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
         <?php if (!empty($transaction['qr_url'])): ?>
         <div class="flex justify-center mb-5">
             <div class="p-3 bg-white border-2 border-slate-200 rounded-xl shadow-sm">
-                <img src="<?= e($transaction['qr_url']) ?>" alt="QRIS" class="w-48 h-48 object-contain" id="qrImage">
+                <?php
+                // Check if qr_url is a raw QRIS string (starts with "000201") or a URL
+                $qrData = $transaction['qr_url'];
+                $isRawQris = !str_starts_with($qrData, 'http');
+                if ($isRawQris):
+                    // Use QR code generator API to render the raw QRIS string as an image
+                    $qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($qrData);
+                ?>
+                <img src="<?= e($qrImageUrl) ?>" alt="QRIS" class="w-48 h-48 object-contain" id="qrImage">
+                <?php else: ?>
+                <img src="<?= e($qrData) ?>" alt="QRIS" class="w-48 h-48 object-contain" id="qrImage">
+                <?php endif; ?>
             </div>
         </div>
-        <p class="text-center text-xs text-slate-500 mb-4">Scan QR code dengan aplikasi e-wallet atau mobile banking</p>
+        <div class="text-center mb-4">
+            <p class="text-xs text-slate-500">Scan QR code dengan aplikasi e-wallet atau mobile banking</p>
+            <div class="flex items-center justify-center gap-2 mt-2">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/QRIS_logo.svg/120px-QRIS_logo.svg.png" alt="QRIS" class="h-5">
+            </div>
+        </div>
         <?php endif; ?>
 
-        <!-- Payment Link Button -->
-        <?php if (!empty($transaction['payment_url'])): ?>
-        <a href="<?= e($transaction['payment_url']) ?>" target="_blank" class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-colors mb-4">
-            Bayar Sekarang
-        </a>
-        <?php endif; ?>
+
+        <!-- Payment instructions -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+            <p class="text-sm font-medium text-blue-800 mb-2">Cara Pembayaran:</p>
+            <ol class="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                <li>Buka aplikasi e-wallet atau mobile banking</li>
+                <li>Pilih menu Scan QR / QRIS</li>
+                <li>Scan QR code di atas</li>
+                <li>Konfirmasi pembayaran sebesar <strong><?= format_currency($transaction['amount']) ?></strong></li>
+            </ol>
+        </div>
 
         <!-- Countdown Timer -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center mb-4">

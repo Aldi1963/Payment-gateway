@@ -144,8 +144,18 @@ class TransactionService
         $transaction['api_response'] = $apiResult['raw_response'] ?? json_encode($apiResult);
 
         if ($apiResult['success']) {
-            $transaction['payment_url'] = $apiResult['payment_url'];
+            // Store QR data from AldiQRIS for display on our own page
             $transaction['qr_url'] = $apiResult['qr_url'];
+            
+            // Store AldiQRIS payment link in note for admin reference
+            $providerPaymentUrl = $apiResult['payment_url'];
+            if ($providerPaymentUrl) {
+                $transaction['note'] = ($transaction['note'] ? $transaction['note'] . ' | ' : '') .
+                                       'provider_url:' . $providerPaymentUrl;
+            }
+            
+            // payment_url points to OUR branded checkout page, not AldiQRIS
+            $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
         } else {
             // Still save the transaction even if API fails
             $transaction['status'] = 'FAILED';
