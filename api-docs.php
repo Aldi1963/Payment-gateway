@@ -28,16 +28,18 @@ $appUrl = setting('app_url', app_url(''));
 
     <?php
     $endpoints = [
-        ['method'=>'POST','path'=>'?action=create_transaction','title'=>'Create Transaction','desc'=>'Buat transaksi pembayaran baru','params'=>[
-            ['name'=>'order_id','type'=>'string','required'=>false,'desc'=>'Order ID unik (auto-generate jika kosong)'],
+        ['method'=>'POST','path'=>'?action=create_transaction','title'=>'Create Transaction','desc'=>'Buat transaksi pembayaran baru (QRIS atau Midtrans VA/QRIS/e-wallet)','params'=>[
             ['name'=>'amount','type'=>'integer','required'=>true,'desc'=>'Jumlah pembayaran dalam Rupiah'],
+            ['name'=>'order_id','type'=>'string','required'=>false,'desc'=>'Order ID unik (auto-generate jika kosong)'],
+            ['name'=>'payment_channel','type'=>'string','required'=>false,'desc'=>'Channel: qris (default) atau midtrans'],
+            ['name'=>'payment_method','type'=>'string','required'=>false,'desc'=>'Metode spesifik: midtrans_bca_va, midtrans_bni_va, midtrans_qris, midtrans_gopay, dll'],
             ['name'=>'link_name','type'=>'string','required'=>false,'desc'=>'Nama/label pembayaran'],
             ['name'=>'webhook_url','type'=>'string','required'=>false,'desc'=>'URL untuk menerima notifikasi'],
             ['name'=>'redirect_url','type'=>'string','required'=>false,'desc'=>'URL redirect setelah bayar'],
             ['name'=>'customer_name','type'=>'string','required'=>false,'desc'=>'Nama customer'],
             ['name'=>'customer_wa','type'=>'string','required'=>false,'desc'=>'Nomor WhatsApp customer'],
             ['name'=>'customer_email','type'=>'string','required'=>false,'desc'=>'Email customer'],
-        ],'response'=>'{"success":true,"data":{"id":"uuid","order_id":"INV-...","amount":50000,"fee":350,"net_amount":49650,"status":"PENDING","payment_url":"https://...","qr_url":"https://...","created_at":"2026-07-07 10:00:00"}}'],
+        ],'response'=>'{"success":true,"data":{"id":"uuid","order_id":"INV-...","amount":50000,"fee":350,"net_amount":49650,"status":"PENDING","payment_channel":"qris","payment_method":null,"payment_url":"https://.../pay.php?order_id=INV-...","qr_url":"https://...","created_at":"2026-07-08 10:00:00"}}'],
         ['method'=>'GET','path'=>'?action=get_transaction&order_id=INV-XXX','title'=>'Get Transaction','desc'=>'Cek status transaksi berdasarkan order_id','params'=>[
             ['name'=>'order_id','type'=>'string','required'=>true,'desc'=>'Order ID yang ingin dicek'],
         ],'response'=>'{"success":true,"data":{"id":"uuid","order_id":"INV-...","amount":50000,"status":"PAID","paid_at":"2026-07-07 10:05:00"}}'],

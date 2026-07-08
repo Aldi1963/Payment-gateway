@@ -81,15 +81,9 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
     <?php
-    // Load Midtrans Snap.js if this is a Midtrans transaction
-    $isMidtrans = ($transaction['payment_channel'] ?? '') === 'midtrans' && !empty($transaction['snap_token']);
-    if ($isMidtrans):
-        $midtransClientKey = setting('midtrans_client_key', '');
-        $isProduction = setting('midtrans_is_production', '0') === '1';
-        $snapJsUrl = $isProduction ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js';
+    // Midtrans detection for custom checkout
+    $isMidtrans = ($transaction['payment_channel'] ?? '') === 'midtrans';
     ?>
-    <script src="<?= e($snapJsUrl) ?>" data-client-key="<?= e($midtransClientKey) ?>"></script>
-    <?php endif; ?>
 </head>
 <body class="min-h-screen font-sans bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center p-4">
 
@@ -168,26 +162,87 @@ $isQris = !$isMidtrans;
         </div>
 
 <?php if ($isMidtrans): ?>
-        <!-- ========== MIDTRANS SNAP CHECKOUT ========== -->
-        <div id="midtrans-checkout" class="mb-5">
-            <button id="pay-button" onclick="payWithSnap()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 text-lg">
-                Bayar Sekarang
-            </button>
-            <p class="text-center text-xs text-slate-400 mt-3">Pilih metode pembayaran: VA, Kartu Kredit, GoPay, ShopeePay, dll</p>
+        <!-- ========== MIDTRANS CHECKOUT (OUR PAGE) ========== -->
+        <?php
+        // Decode provider metadata from snap_token field
+        $midtransMeta = json_decode($transaction['snap_token'] ?? '{}', true) ?: [];
+        $vaNumber = $midtransMeta['va_number'] ?? null;
+        $vaBank = $midtransMeta['va_bank'] ?? null;
+        $deeplink = $midtransMeta['deeplink'] ?? null;
+        $paymentCode = $midtransMeta['payment_code'] ?? null;
+        $paymentType = $midtransMeta['payment_type'] ?? '';
+        $qrUrl = $transaction['qr_url'] ?? null;
+        ?>
+
+        <?php if ($vaNumber): ?>
+        <!-- Virtual Account Display -->
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-5 mb-5">
+            <p class="text-xs text-indigo-600 font-medium mb-1">Transfer ke Virtual Account</p>
+            <p class="text-sm font-bold text-indigo-900 mb-3"><?= e($vaBank ?? 'BANK') ?></p>
+            <div class="flex items-center gap-2 bg-white border border-indigo-200 rounded-lg p-3">
+                <p class="flex-1 text-xl font-bold font-mono text-slate-900 tracking-wider" id="vaNumberDisplay"><?= e($vaNumber) ?></p>
+                <button onclick="copyVA()" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition-colors">Copy</button>
+            </div>
+            <p class="text-xs text-indigo-500 mt-2">Salin nomor VA dan bayar melalui ATM, Mobile Banking, atau Internet Banking <?= e($vaBank ?? '') ?></p>
         </div>
 
-        <!-- Midtrans payment info -->
-        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
-            <p class="text-sm font-medium text-indigo-800 mb-2">Metode Pembayaran Tersedia:</p>
-            <div class="flex flex-wrap gap-2">
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">VA Bank</span>
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">Kartu Kredit</span>
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">GoPay</span>
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">ShopeePay</span>
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">QRIS</span>
-                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">Alfamart</span>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+            <p class="text-sm font-medium text-blue-800 mb-2">Cara Pembayaran:</p>
+            <ol class="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                <li>Buka aplikasi Mobile Banking atau ATM <?= e($vaBank ?? '') ?></li>
+                <li>Pilih menu Transfer &rarr; Virtual Account</li>
+                <li>Masukkan nomor VA: <strong class="font-mono"><?= e($vaNumber) ?></strong></li>
+                <li>Masukkan nominal: <strong><?= format_currency($transaction['amount']) ?></strong></li>
+                <li>Konfirmasi dan selesaikan pembayaran</li>
+            </ol>
+        </div>
+
+        <?php elseif ($qrUrl): ?>
+        <!-- QRIS Display (Midtrans QRIS) -->
+        <div class="flex justify-center mb-5">
+            <div class="p-3 bg-white border-2 border-indigo-200 rounded-xl shadow-sm">
+                <img src="<?= e($qrUrl) ?>" alt="QRIS" class="w-48 h-48 object-contain" id="qrImage">
             </div>
         </div>
+        <div class="text-center mb-4">
+            <p class="text-xs text-slate-500">Scan QR code dengan aplikasi e-wallet atau mobile banking</p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+            <p class="text-sm font-medium text-blue-800 mb-2">Cara Pembayaran:</p>
+            <ol class="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                <li>Buka aplikasi e-wallet (GoPay, OVO, DANA, dll)</li>
+                <li>Pilih menu Scan / QRIS</li>
+                <li>Scan QR code di atas</li>
+                <li>Konfirmasi pembayaran sebesar <strong><?= format_currency($transaction['amount']) ?></strong></li>
+            </ol>
+        </div>
+
+        <?php elseif ($deeplink): ?>
+        <!-- E-Wallet Deeplink (GoPay/ShopeePay) -->
+        <div class="text-center mb-5">
+            <a href="<?= e($deeplink) ?>" class="inline-block w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg text-lg">
+                Bayar dengan <?= e(ucfirst($paymentType)) ?>
+            </a>
+            <p class="text-xs text-slate-400 mt-3">Klik tombol di atas untuk membuka aplikasi pembayaran</p>
+        </div>
+
+        <?php elseif ($paymentCode): ?>
+        <!-- Payment Code (Alfamart/Indomaret) -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-5">
+            <p class="text-xs text-amber-600 font-medium mb-1">Kode Pembayaran</p>
+            <div class="flex items-center gap-2 bg-white border border-amber-200 rounded-lg p-3">
+                <p class="flex-1 text-xl font-bold font-mono text-slate-900 tracking-wider"><?= e($paymentCode) ?></p>
+                <button onclick="navigator.clipboard.writeText('<?= e($paymentCode) ?>')" class="px-3 py-1.5 bg-amber-600 text-white text-xs rounded-lg hover:bg-amber-700">Copy</button>
+            </div>
+            <p class="text-xs text-amber-500 mt-2">Tunjukkan kode ini di kasir Alfamart/Indomaret</p>
+        </div>
+
+        <?php else: ?>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-center">
+            <p class="text-sm text-amber-700">Menunggu detail pembayaran...</p>
+        </div>
+        <?php endif; ?>
 
 <?php else: ?>
         <!-- ========== QRIS CHECKOUT ========== -->
@@ -319,43 +374,14 @@ $isQris = !$isMidtrans;
     setTimeout(checkStatus, 2000);
 })();
 
-<?php if ($isMidtrans): ?>
-// Midtrans Snap.js integration
-function payWithSnap() {
-    const btn = document.getElementById('pay-button');
-    btn.disabled = true;
-    btn.textContent = 'Memproses...';
-    
-    window.snap.pay('<?= e($transaction['snap_token']) ?>', {
-        onSuccess: function(result) {
-            document.getElementById('statusBox').className = 'bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center';
-            document.getElementById('statusText').textContent = '✓ Pembayaran berhasil!';
-            document.getElementById('statusText').className = 'text-sm font-bold text-emerald-700';
-            setTimeout(() => location.reload(), 1500);
-        },
-        onPending: function(result) {
-            btn.disabled = false;
-            btn.textContent = 'Bayar Sekarang';
-            document.getElementById('statusText').textContent = 'Menunggu pembayaran...';
-        },
-        onError: function(result) {
-            btn.disabled = false;
-            btn.textContent = 'Coba Lagi';
-            document.getElementById('statusBox').className = 'bg-red-50 border border-red-200 rounded-xl p-3 text-center';
-            document.getElementById('statusText').textContent = 'Pembayaran gagal. Silakan coba lagi.';
-            document.getElementById('statusText').className = 'text-sm font-medium text-red-700';
-        },
-        onClose: function() {
-            btn.disabled = false;
-            btn.textContent = 'Bayar Sekarang';
-        }
+<?php if ($isMidtrans && !empty($midtransMeta['va_number'])): ?>
+function copyVA() {
+    navigator.clipboard.writeText('<?= e($midtransMeta['va_number'] ?? '') ?>').then(() => {
+        const btn = document.querySelector('[onclick="copyVA()"]');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
     });
 }
-
-// Auto-open Snap on page load
-window.addEventListener('load', function() {
-    setTimeout(payWithSnap, 500);
-});
 <?php endif; ?>
 </script>
 <?php endif; ?>

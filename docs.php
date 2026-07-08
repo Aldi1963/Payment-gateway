@@ -79,7 +79,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 <!-- Introduction -->
 <section id="introduction" class="mb-16">
     <h1 class="text-4xl font-extrabold text-slate-900 mb-4">API Documentation</h1>
-    <p class="text-lg text-slate-600 leading-relaxed mb-6">Integrasi pembayaran QRIS dengan <?= e($appName) ?>. Terima pembayaran dari semua e-wallet dan mobile banking Indonesia dalam hitungan menit.</p>
+    <p class="text-lg text-slate-600 leading-relaxed mb-6">Integrasi pembayaran multi-channel dengan <?= e($appName) ?>. Terima pembayaran QRIS, Virtual Account, GoPay, ShopeePay dari semua bank dan e-wallet Indonesia.</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4">
             <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
@@ -176,7 +176,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         <span class="px-3 py-1 rounded-lg text-xs font-bold font-mono bg-emerald-100 text-emerald-700">POST</span>
         <h2 class="text-2xl font-bold text-slate-900">Create Transaction</h2>
     </div>
-    <p class="text-slate-600 mb-4">Buat transaksi pembayaran QRIS baru. Customer akan diarahkan ke halaman pembayaran dengan QR code.</p>
+    <p class="text-slate-600 mb-4">Buat transaksi pembayaran baru. Pilih channel QRIS (default) atau Midtrans (VA, QRIS, GoPay, ShopeePay). Customer akan diarahkan ke halaman pembayaran branded Anda.</p>
     
     <div class="bg-slate-900 rounded-xl overflow-hidden mb-6">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-800">
@@ -193,6 +193,8 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
             <tbody class="divide-y divide-slate-100">
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">amount</td><td class="px-4 py-3 text-slate-500">integer</td><td class="px-4 py-3"><span class="text-red-500 font-bold text-xs">Yes</span></td><td class="px-4 py-3 text-slate-600">Jumlah pembayaran (Rupiah)</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">order_id</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Order ID unik (auto-generate jika kosong)</td></tr>
+                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">payment_channel</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Channel: <code>qris</code> (default) atau <code>midtrans</code></td></tr>
+                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">payment_method</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Metode: <code>midtrans_bca_va</code>, <code>midtrans_bni_va</code>, <code>midtrans_qris</code>, <code>midtrans_gopay</code>, dll</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">link_name</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Nama/deskripsi pembayaran</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">customer_name</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Nama customer</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">customer_email</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Email customer</td></tr>
@@ -201,6 +203,16 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">redirect_url</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">URL redirect setelah bayar</td></tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Payment Channels Info -->
+    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
+        <p class="text-sm font-medium text-indigo-800 mb-2">Payment Channels:</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-indigo-700">
+            <div><strong>qris</strong> (default) — QRIS semua bank & e-wallet</div>
+            <div><strong>midtrans</strong> — VA Bank, GoPay, ShopeePay, QRIS</div>
+        </div>
+        <p class="text-xs text-indigo-600 mt-2">Midtrans payment_method: <code>midtrans_bca_va</code>, <code>midtrans_bni_va</code>, <code>midtrans_bri_va</code>, <code>midtrans_permata_va</code>, <code>midtrans_mandiri_bill</code>, <code>midtrans_gopay</code>, <code>midtrans_shopeepay</code>, <code>midtrans_qris</code></p>
     </div>
 
 
@@ -218,7 +230,8 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
   -d '{
     "amount": 50000,
     "order_id": "INV-001",
-    "link_name": "Pembayaran Produk A",
+    "payment_channel": "midtrans",
+    "payment_method": "midtrans_bca_va",
     "customer_name": "John Doe"
   }'</code></pre>
             </div>
@@ -236,8 +249,10 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
     "fee": 350,
     "net_amount": 49650,
     "status": "PENDING",
+    "payment_channel": "midtrans",
+    "payment_method": "midtrans_bca_va",
     "payment_url": "https://pay.../pay.php?order_id=INV-001",
-    "qr_url": "https://...",
+    "qr_url": null,
     "created_at": "2026-07-08 10:00:00"
   }
 }</code></pre>

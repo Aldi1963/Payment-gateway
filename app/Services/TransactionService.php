@@ -185,14 +185,23 @@ class TransactionService
                 $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
 
             } elseif ($channelCode === 'midtrans') {
-                // Midtrans: store snap_token, point payment_url to our page (which loads Snap)
-                $transaction['snap_token'] = $apiResult['snap_token'] ?? null;
+                // Midtrans Core API: get VA/QRIS/deeplink directly
                 $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
-                // Store Midtrans redirect URL as fallback
-                if (!empty($apiResult['payment_url'])) {
-                    $transaction['note'] = ($transaction['note'] ? $transaction['note'] . ' | ' : '') .
-                                           'midtrans_redirect:' . $apiResult['payment_url'];
-                }
+                $transaction['qr_url'] = $apiResult['qr_url'] ?? null;
+                $transaction['snap_token'] = null; // Not using Snap anymore
+                
+                // Store Midtrans payment details in note as JSON metadata
+                $midtransMeta = array_filter([
+                    'va_number' => $apiResult['va_number'] ?? null,
+                    'va_bank' => $apiResult['va_bank'] ?? null,
+                    'deeplink' => $apiResult['deeplink'] ?? null,
+                    'payment_code' => $apiResult['payment_code'] ?? null,
+                    'payment_type' => $apiResult['payment_type'] ?? null,
+                    'midtrans_transaction_id' => $apiResult['midtrans_transaction_id'] ?? null,
+                    'expiry_time' => $apiResult['expiry_time'] ?? null,
+                ]);
+                // Store as JSON in snap_token field (repurposed as provider_meta)
+                $transaction['snap_token'] = json_encode($midtransMeta);
 
             } else {
                 // Other channels: use whatever URL they return
