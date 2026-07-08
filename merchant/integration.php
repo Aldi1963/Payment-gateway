@@ -1,140 +1,81 @@
 <?php
 /**
- * Integrasi API - Consolidated Page
- * Tabs: API Key, Webhook, Test Webhook, Riwayat Perubahan
+ * Integrasi API - Dokumentasi & Testing
+ * 
+ * Halaman ini hanya untuk:
+ * - Dokumentasi endpoint API
+ * - Contoh request/response
+ * - Test webhook
+ * - Webhook signature verification
+ * 
+ * Semua konfigurasi (API key, webhook URL, IP whitelist) diatur dari:
+ * /merchant/project-settings.php
  */
 require_once __DIR__ . '/../includes/init.php';
 Auth::requireMerchant();
 
 require_once base_path('app/Controllers/MerchantController.php');
-require_once base_path('app/Services/ConfigChangeService.php');
-
 $controller = new MerchantController();
-$configService = new ConfigChangeService();
 $merchant = $controller->getMerchant();
 $merchantId = Auth::merchantId();
 
-$activeTab = $_GET['tab'] ?? 'apikey';
-$validTabs = ['apikey', 'webhook', 'test', 'history'];
-if (!in_array($activeTab, $validTabs)) $activeTab = 'apikey';
+$activeTab = $_GET['tab'] ?? 'docs';
+$validTabs = ['docs', 'webhook-docs', 'test'];
+if (!in_array($activeTab, $validTabs)) $activeTab = 'docs';
 
-// Handle POST actions
-if (is_post()) {
+// Handle Test Webhook POST
+$testResult = null;
+if (is_post() && $activeTab === 'test') {
     Auth::verifyCsrf();
-    $action = $_POST['_action'] ?? $_POST['action'] ?? '';
-
-    if ($activeTab === 'apikey' && $action === 'regenerate') {
-        $password = $_POST['confirm_password'] ?? '';
-        if (!$configService->verifyPassword(Auth::id(), $password)) {
-            flash('error', 'Password tidak valid. Verifikasi gagal.');
-            redirect('/merchant/integration.php?tab=apikey');
-        }
-        $requireApproval = setting('require_approval_api_key', '1') === '1';
-        if ($requireApproval) {
-            $result = $configService->requestChange([
-                'merchant_id' => $merchantId,
-                'change_type' => 'api_key_regenerate',
-                'old_value' => mask_api_key($merchant['api_key']),
-                'new_value' => '(akan di-generate otomatis setelah approved)',
-                'reason' => sanitize($_POST['reason'] ?? 'Regenerate API Key'),
-                'requested_by' => Auth::id(),
-                'requested_by_role' => Auth::role(),
-            ]);
-        } else {
-            $result = $controller->regenerateApiKey();
-        }
-        flash($result['success'] ? 'success' : 'error', $result['message']);
-        redirect('/merchant/integration.php?tab=apikey');
+    $webhookUrl = $merchant['webhook_url'] ?? '';
+    if (empty($webhookUrl)) {
+        flash('error', 'Webhook URL belum dikonfigurasi. Atur di Project Settings.');
+        redirect('/merchant/integration.php?tab=test');
     }
+    $testPayload = [
+        'event' => 'payment.test',
+        'transaction_id' => 'test-' . generate_random(8),
+        'order_id' => 'TEST-' . date('Ymd') . '-' . strtoupper(generate_random(4)),
+        'status' => 'settlement',
+        'amount' => (int)($_POST['test_amount'] ?? 50000),
+        'fee' => 350,
+        'net_amount' => (int)($_POST['test_amount'] ?? 50000) - 350,
+        'paid_at' => now(),
+        'timestamp' => now(),
+        '_test' => true,
+    ];
+    $jsonPayload = json_encode($testPayload);
+    $signature = hash_hmac('sha256', $jsonPayload, $merchant['api_key']);
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $webhookUrl,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $jsonPayload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_CONNECTTIMEOUT => 5,
 
-    if ($activeTab === 'webhook' && $action === 'request_change') {
-        $password = $_POST['confirm_password'] ?? '';
-        if (!$configService->verifyPassword(Auth::id(), $password)) {
-            flash('error', 'Password tidak valid. Verifikasi gagal.');
-            redirect('/merchant/integration.php?tab=webhook');
-        }
-        $changeType = $_POST['change_type'] ?? '';
-        $oldValueMap = ['webhook_url' => $merchant['webhook_url'] ?? '', 'redirect_url' => $merchant['redirect_url'] ?? ''];
-        $result = $configService->requestChange([
-            'merchant_id' => $merchantId,
-            'change_type' => $changeType,
-            'old_value' => $oldValueMap[$changeType] ?? '',
-            'new_value' => sanitize($_POST['new_value'] ?? ''),
-            'reason' => sanitize($_POST['reason'] ?? ''),
-            'requested_by' => Auth::id(),
-            'requested_by_role' => Auth::role(),
-        ]);
-        flash($result['success'] ? 'success' : 'error', $result['message']);
-        redirect('/merchant/integration.php?tab=webhook');
-    }
-
-    if ($action === 'cancel_change' || $action === 'cancel') {
-        $changeId = $_POST['change_id'] ?? '';
-        $result = $configService->cancel($changeId, $merchantId);
-        flash($result['success'] ? 'success' : 'error', $result['message']);
-        redirect('/merchant/integration.php?tab=' . $activeTab);
-    }
-
-    // Test webhook POST
-    if ($activeTab === 'test') {
-        $webhookUrl = $merchant['webhook_url'] ?? '';
-        if (empty($webhookUrl)) {
-            flash('error', 'Webhook URL belum dikonfigurasi.');
-            redirect('/merchant/integration.php?tab=test');
-        }
-        $testPayload = [
-            'event' => 'payment.test',
-            'transaction_id' => 'test-' . generate_random(8),
-            'order_id' => 'TEST-' . date('Ymd') . '-' . strtoupper(generate_random(4)),
-            'status' => 'settlement',
-            'amount' => (int)($_POST['test_amount'] ?? 50000),
-            'fee' => 350,
-            'net_amount' => (int)($_POST['test_amount'] ?? 50000) - 350,
-            'paid_at' => now(),
-            'timestamp' => now(),
-            '_test' => true,
-        ];
-        $jsonPayload = json_encode($testPayload);
-        $signature = hash_hmac('sha256', $jsonPayload, $merchant['api_key']);
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $webhookUrl,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $jsonPayload,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'X-Signature: ' . $signature,
-                'User-Agent: ClipkuPay-Webhook-Test/1.0',
-            ],
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        $totalTime = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
-        curl_close($ch);
-        $testResult = [
-            'url' => $webhookUrl, 'payload' => $testPayload, 'signature' => $signature,
-            'http_code' => $httpCode, 'response' => $response, 'error' => $error,
-            'time_ms' => (int)($totalTime * 1000), 'success' => ($httpCode >= 200 && $httpCode < 300),
-        ];
-    }
-}
-
-// Load data for tabs
-$pendingChanges = $configService->getPendingByMerchant($merchantId);
-$hasPendingKey = !empty(array_filter($pendingChanges, fn($c) => $c['change_type'] === 'api_key_regenerate'));
-$pendingWebhook = array_filter($pendingChanges, fn($c) => $c['change_type'] === 'webhook_url');
-$pendingRedirect = array_filter($pendingChanges, fn($c) => $c['change_type'] === 'redirect_url');
-$hasPendingWebhook = !empty($pendingWebhook);
-$hasPendingRedirect = !empty($pendingRedirect);
-
-$historyPagination = null;
-if ($activeTab === 'history') {
-    $allChanges = $configService->getHistoryByMerchant($merchantId);
-    $historyPagination = paginate($allChanges, (int)($_GET['page'] ?? 1), 15);
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'X-Signature: ' . $signature,
+            'User-Agent: ClipkuPay-Webhook-Test/1.0',
+        ],
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    $totalTime = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+    curl_close($ch);
+    $testResult = [
+        'url' => $webhookUrl,
+        'payload' => $testPayload,
+        'signature' => $signature,
+        'http_code' => $httpCode,
+        'response' => $response,
+        'error' => $error,
+        'time_ms' => (int)($totalTime * 1000),
+        'success' => ($httpCode >= 200 && $httpCode < 300),
+    ];
 }
 
 $pageTitle = 'Integrasi API';
@@ -142,11 +83,26 @@ require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/merchant_layout.php';
 ?>
 
+<!-- Info banner: settings are in Project Settings -->
+<div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>
+            <p class="text-sm text-blue-800">API Key, Webhook URL, dan IP Whitelist diatur dari <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=api" class="font-semibold underline hover:text-blue-900">Project Settings</a>.</p>
+            <p class="text-xs text-blue-600 mt-1">Halaman ini berisi dokumentasi teknis dan testing untuk proyek aktif Anda.</p>
+        </div>
+    </div>
+</div>
+
 <!-- Tab Navigation -->
 <div class="border-b border-slate-200 mb-6">
     <nav class="flex gap-1 -mb-px overflow-x-auto">
         <?php
-        $tabs = ['apikey' => 'API Key', 'webhook' => 'Webhook', 'test' => 'Test Webhook', 'history' => 'Riwayat Perubahan'];
+        $tabs = [
+            'docs' => 'Dokumentasi API',
+            'webhook-docs' => 'Webhook & Signature',
+            'test' => 'Test Webhook',
+        ];
         foreach ($tabs as $key => $label): ?>
         <a href="?tab=<?= $key ?>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors <?= $activeTab === $key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300' ?>">
             <?= $label ?>
@@ -156,133 +112,274 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 </div>
 
 
-<?php if ($activeTab === 'apikey'): ?>
-<!-- ============ TAB: API KEY ============ -->
-<div class="max-w-2xl space-y-6">
-    <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">API Key Anda</h3>
-        <p class="text-sm text-slate-500 mb-4">Gunakan API key ini untuk autentikasi pada semua request API. <strong>Jangan bagikan ke pihak lain.</strong></p>
-        
-        <div class="flex items-center gap-2 mb-4">
-            <input type="text" id="apiKeyField" value="<?= e($merchant['api_key'] ?? '') ?>" readonly class="flex-1 px-4 py-3 bg-slate-900 text-emerald-400 font-mono text-sm rounded-lg border-0">
-            <button onclick="copyToClipboard('apiKeyField')" class="px-4 py-3 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">Copy</button>
-        </div>
+<?php if ($activeTab === 'docs'): ?>
+<!-- ============ TAB: DOKUMENTASI API ============ -->
+<div class="max-w-3xl space-y-6">
 
-        <div class="pt-4 border-t border-slate-200">
-            <p class="text-xs text-slate-400 mb-3">Masked: <?= mask_api_key($merchant['api_key'] ?? '') ?></p>
-            
-            <?php if ($hasPendingKey): ?>
-            <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p class="text-xs text-amber-700 font-medium">Regenerasi API key menunggu persetujuan admin.</p>
+    <!-- Base Info -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Endpoint API</h3>
+        <div class="space-y-3 text-sm">
+            <div>
+                <span class="text-xs text-slate-500">Base URL:</span>
+                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono"><?= e(app_url('api/v1/')) ?></code>
             </div>
-            <?php else: ?>
-            <form method="POST" action="?tab=apikey" class="space-y-3">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="regenerate">
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">Alasan <span class="text-slate-400">(opsional)</span></label>
-                    <input type="text" name="reason" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" placeholder="Compromised, rotasi rutin, dll.">
-                </div>
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">Konfirmasi Password <span class="text-red-500">*</span></label>
-                    <input type="password" name="confirm_password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" placeholder="Masukkan password Anda">
-                </div>
-                <button type="submit" onclick="return confirm('API key lama tidak berlaku setelah disetujui. Lanjutkan?')" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 border border-red-200">
-                    Ajukan Regenerate API Key
-                </button>
-            </form>
-            <?php endif; ?>
+            <div>
+                <span class="text-xs text-slate-500">Authentication:</span>
+                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">Authorization: Bearer YOUR_API_KEY</code>
+            </div>
+            <div>
+                <span class="text-xs text-slate-500">Content-Type:</span>
+                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">application/json</code>
+            </div>
         </div>
     </div>
 
-    <!-- Quick API Reference -->
+    <!-- Create Transaction -->
     <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 class="text-sm font-semibold text-slate-800 mb-3">Quick Reference</h3>
-        <div class="space-y-3 text-sm">
-            <div><span class="text-xs text-slate-500">Base URL:</span><code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono"><?= e(app_url('api/index.php')) ?></code></div>
-            <div><span class="text-xs text-slate-500">Header:</span><code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">Authorization: Bearer YOUR_API_KEY</code></div>
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">
+            <span class="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-mono mr-2">POST</span>
+            /api/v1/transactions
+        </h4>
+        <p class="text-sm text-slate-600 mb-4">Membuat transaksi pembayaran baru.</p>
+        
+        <div class="mb-4">
+            <p class="text-xs font-medium text-slate-500 mb-2">Request Body:</p>
+            <pre class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">{
+  "order_id": "INV-20250708-001",
+  "amount": 150000,
+  "customer_name": "John Doe",
+  "customer_email": "john@example.com",
+  "customer_wa": "628123456789",
+  "note": "Pembelian Paket Premium",
+  "expiry_minutes": 60
+}</pre>
         </div>
-        <a href="/docs.php" target="_blank" class="inline-block mt-4 text-xs text-blue-600 font-medium hover:text-blue-700">Lihat Dokumentasi Lengkap &rarr;</a>
+
+        <div>
+            <p class="text-xs font-medium text-slate-500 mb-2">Response (201 Created):</p>
+            <pre class="text-xs font-mono bg-slate-900 text-blue-300 rounded-lg p-4 overflow-x-auto">{
+  "success": true,
+  "data": {
+    "id": "a1b87ce9-c215-4458-b3c2-a650e20011db",
+    "order_id": "INV-20250708-001",
+    "amount": 150000,
+    "fee": 1050,
+    "net_amount": 148950,
+    "status": "pending",
+    "payment_url": "https://pay.clipku.com/pay/a1b87ce9...",
+    "qr_url": "https://pay.clipku.com/qr/a1b87ce9...",
+    "expires_at": "2025-07-08T11:00:00+07:00"
+  }
+}</pre>
+        </div>
+    </div>
+
+    <!-- Check Status -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">
+            <span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-mono mr-2">GET</span>
+            /api/v1/transactions/{id}
+        </h4>
+        <p class="text-sm text-slate-600 mb-4">Cek status transaksi.</p>
+        
+        <div>
+            <p class="text-xs font-medium text-slate-500 mb-2">Response:</p>
+            <pre class="text-xs font-mono bg-slate-900 text-blue-300 rounded-lg p-4 overflow-x-auto">{
+  "success": true,
+  "data": {
+    "id": "a1b87ce9-...",
+    "order_id": "INV-20250708-001",
+    "amount": 150000,
+    "status": "settlement",
+    "paid_at": "2025-07-08T10:05:23+07:00"
+  }
+}</pre>
+        </div>
+    </div>
+
+
+    <!-- cURL Example -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Contoh cURL</h4>
+        <div class="relative">
+            <pre id="curlExample" class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">curl -X POST <?= e(app_url('api/v1/transactions')) ?> \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "INV-001",
+    "amount": 50000,
+    "customer_name": "Customer",
+    "customer_wa": "628123456789"
+  }'</pre>
+            <button onclick="copyCode('curlExample')" class="absolute top-2 right-2 px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600">Copy</button>
+        </div>
+    </div>
+
+    <!-- Status Codes -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Status Transaksi</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead><tr class="border-b border-slate-200"><th class="py-2 text-left text-xs text-slate-500">Status</th><th class="py-2 text-left text-xs text-slate-500">Keterangan</th></tr></thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">pending</code></td><td class="py-2 text-sm text-slate-600">Menunggu pembayaran</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">settlement</code></td><td class="py-2 text-sm text-slate-600">Pembayaran berhasil</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-red-100 text-red-800 rounded">expired</code></td><td class="py-2 text-sm text-slate-600">Pembayaran kedaluwarsa</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded">canceled</code></td><td class="py-2 text-sm text-slate-600">Dibatalkan</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded">refunded</code></td><td class="py-2 text-sm text-slate-600">Dana dikembalikan</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Error Codes -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">HTTP Status Codes</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead><tr class="border-b border-slate-200"><th class="py-2 text-left text-xs text-slate-500">Code</th><th class="py-2 text-left text-xs text-slate-500">Keterangan</th></tr></thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr><td class="py-2 font-mono text-xs">200</td><td class="py-2 text-sm text-slate-600">OK</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">201</td><td class="py-2 text-sm text-slate-600">Created - Transaksi berhasil dibuat</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">400</td><td class="py-2 text-sm text-slate-600">Bad Request - Parameter tidak valid</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">401</td><td class="py-2 text-sm text-slate-600">Unauthorized - API key salah/tidak ada</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">403</td><td class="py-2 text-sm text-slate-600">Forbidden - IP tidak di-whitelist</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">404</td><td class="py-2 text-sm text-slate-600">Not Found - Resource tidak ditemukan</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">429</td><td class="py-2 text-sm text-slate-600">Too Many Requests - Rate limit terlampaui</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">500</td><td class="py-2 text-sm text-slate-600">Internal Server Error</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<?php elseif ($activeTab === 'webhook'): ?>
-<!-- ============ TAB: WEBHOOK ============ -->
-<div class="max-w-2xl space-y-6">
-    <!-- Current Config -->
+
+<?php elseif ($activeTab === 'webhook-docs'): ?>
+<!-- ============ TAB: WEBHOOK & SIGNATURE ============ -->
+<div class="max-w-3xl space-y-6">
+
+    <!-- How Webhooks Work -->
     <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Konfigurasi Aktif</h3>
-        <div class="space-y-4">
-            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <div class="flex items-center justify-between mb-1">
-                    <label class="text-sm font-medium text-slate-700">Webhook URL</label>
-                    <?php if ($hasPendingWebhook): ?><span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Pending</span><?php endif; ?>
-                </div>
-                <p class="text-sm font-mono text-slate-600 break-all"><?= e($merchant['webhook_url'] ?: '(belum diatur)') ?></p>
-            </div>
-            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <div class="flex items-center justify-between mb-1">
-                    <label class="text-sm font-medium text-slate-700">Redirect URL</label>
-                    <?php if ($hasPendingRedirect): ?><span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Pending</span><?php endif; ?>
-                </div>
-                <p class="text-sm font-mono text-slate-600 break-all"><?= e($merchant['redirect_url'] ?: '(belum diatur)') ?></p>
-            </div>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Cara Kerja Webhook</h3>
+        <div class="text-sm text-slate-600 space-y-3">
+            <p>Webhook adalah notifikasi HTTP POST yang dikirim ke server Anda setiap kali terjadi event pembayaran. Sistem kami akan mengirimkan payload JSON ke Webhook URL yang telah Anda konfigurasi di <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=webhook" class="text-blue-600 font-medium hover:underline">Project Settings</a>.</p>
+            <ol class="list-decimal list-inside space-y-2 ml-2">
+                <li>Customer melakukan pembayaran</li>
+                <li>Sistem memverifikasi pembayaran</li>
+                <li>Webhook dikirim ke URL Anda dengan payload JSON</li>
+                <li>Server Anda memvalidasi signature dan memproses data</li>
+                <li>Return HTTP 2xx untuk konfirmasi penerimaan</li>
+            </ol>
+            <p class="text-xs text-slate-500 mt-2">Jika server Anda gagal merespons (timeout / non-2xx), webhook akan di-retry hingga 5x dengan backoff eksponensial.</p>
         </div>
     </div>
 
-    <!-- Change Forms -->
+    <!-- Events -->
     <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 class="text-sm font-semibold text-slate-800 mb-4">Ajukan Perubahan</h3>
-        <?php if (!$hasPendingWebhook): ?>
-        <form method="POST" action="?tab=webhook" class="mb-6 pb-6 border-b border-slate-200">
-            <?= csrf_field() ?>
-            <input type="hidden" name="_action" value="request_change">
-            <input type="hidden" name="change_type" value="webhook_url">
-            <div class="mb-3">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Webhook URL Baru</label>
-                <input type="url" name="new_value" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://yourdomain.com/webhook">
-            </div>
-            <div class="mb-3">
-                <label class="block text-xs text-slate-500 mb-1">Alasan</label>
-                <input type="text" name="reason" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Migrasi server, update endpoint">
-            </div>
-            <div class="mb-3">
-                <label class="block text-xs text-slate-500 mb-1">Konfirmasi Password <span class="text-red-500">*</span></label>
-                <input type="password" name="confirm_password" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
-            <button type="submit" onclick="return confirm('Ajukan perubahan webhook URL?')" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Ajukan Perubahan</button>
-        </form>
-        <?php endif; ?>
-        <?php if (!$hasPendingRedirect): ?>
-        <form method="POST" action="?tab=webhook">
-            <?= csrf_field() ?>
-            <input type="hidden" name="_action" value="request_change">
-            <input type="hidden" name="change_type" value="redirect_url">
-            <div class="mb-3">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Redirect URL Baru</label>
-                <input type="url" name="new_value" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://yourdomain.com/success">
-            </div>
-            <div class="mb-3">
-                <label class="block text-xs text-slate-500 mb-1">Alasan</label>
-                <input type="text" name="reason" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
-            <div class="mb-3">
-                <label class="block text-xs text-slate-500 mb-1">Konfirmasi Password <span class="text-red-500">*</span></label>
-                <input type="password" name="confirm_password" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
-            <button type="submit" onclick="return confirm('Ajukan perubahan redirect URL?')" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Ajukan Perubahan</button>
-        </form>
-        <?php endif; ?>
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Event yang Dikirim</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead><tr class="border-b border-slate-200"><th class="py-2 text-left text-xs text-slate-500">Event</th><th class="py-2 text-left text-xs text-slate-500">Keterangan</th></tr></thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">payment.settlement</code></td><td class="py-2 text-slate-600">Pembayaran berhasil / lunas</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">payment.expired</code></td><td class="py-2 text-slate-600">Pembayaran kedaluwarsa</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">payment.refunded</code></td><td class="py-2 text-slate-600">Dana dikembalikan</td></tr>
+                    <tr><td class="py-2"><code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">payment.test</code></td><td class="py-2 text-slate-600">Test webhook (dari halaman ini)</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Signature Info -->
-    <div class="bg-slate-900 rounded-xl p-6">
-        <h4 class="text-sm font-semibold text-slate-300 mb-3">Validasi Signature</h4>
-        <p class="text-xs text-slate-400 mb-3">Header <code class="text-emerald-400">X-Signature</code> = HMAC-SHA256(body, API_KEY)</p>
-        <pre class="text-xs text-emerald-300 font-mono bg-slate-800 rounded-lg p-4 overflow-x-auto">$calculated = hash_hmac('sha256', $payload, $apiKey);
-if (hash_equals($calculated, $signature)) {
-    // Valid webhook
+    <!-- Payload Example -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Contoh Payload</h4>
+        <pre class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">{
+  "event": "payment.settlement",
+  "transaction_id": "a1b87ce9-c215-4458-b3c2-a650e20011db",
+  "order_id": "INV-20250708-001",
+  "status": "settlement",
+  "amount": 150000,
+  "fee": 1050,
+  "net_amount": 148950,
+  "paid_at": "2025-07-08T10:05:23+07:00",
+  "timestamp": "2025-07-08T10:05:24+07:00"
 }</pre>
+    </div>
+
+
+    <!-- Signature Verification -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Validasi Signature</h4>
+        <p class="text-sm text-slate-600 mb-4">Setiap webhook membawa header <code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">X-Signature</code> berisi HMAC-SHA256 dari body menggunakan API Key Anda sebagai secret.</p>
+
+        <div class="mb-4">
+            <p class="text-xs font-medium text-slate-500 mb-2">Headers yang dikirim:</p>
+            <pre class="text-xs font-mono bg-slate-100 rounded-lg p-3 overflow-x-auto">Content-Type: application/json
+X-Signature: &lt;hmac_sha256_hex&gt;
+User-Agent: ClipkuPay-Webhook/1.0</pre>
+        </div>
+
+        <div class="mb-4">
+            <p class="text-xs font-medium text-slate-500 mb-2">PHP - Verifikasi Signature:</p>
+            <pre class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">// 1. Ambil raw body dan signature
+$payload = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
+
+// 2. Hitung HMAC dengan API key Anda
+$calculated = hash_hmac('sha256', $payload, $yourApiKey);
+
+// 3. Bandingkan (timing-safe)
+if (!hash_equals($calculated, $signature)) {
+    http_response_code(401);
+    exit('Invalid signature');
+}
+
+// 4. Proses webhook
+$data = json_decode($payload, true);
+// ... update status order di database Anda</pre>
+        </div>
+
+        <div class="mb-4">
+            <p class="text-xs font-medium text-slate-500 mb-2">Node.js - Verifikasi Signature:</p>
+            <pre class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">const crypto = require('crypto');
+
+app.post('/webhook', (req, res) => {
+  const payload = JSON.stringify(req.body);
+  const signature = req.headers['x-signature'];
+  const calculated = crypto
+    .createHmac('sha256', YOUR_API_KEY)
+    .update(payload)
+    .digest('hex');
+
+  if (calculated !== signature) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Process webhook...
+  res.status(200).send('OK');
+});</pre>
+        </div>
+
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p class="text-xs text-amber-800"><strong>Penting:</strong> Selalu validasi signature sebelum memproses webhook. Jangan pernah mempercayai data tanpa verifikasi.</p>
+        </div>
+    </div>
+
+    <!-- Retry Policy -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h4 class="text-sm font-semibold text-slate-800 mb-3">Retry Policy</h4>
+        <div class="text-sm text-slate-600 space-y-2">
+            <p>Jika webhook gagal (timeout atau non-2xx response), sistem akan melakukan retry:</p>
+            <ul class="list-disc list-inside space-y-1 ml-2">
+                <li>Retry ke-1: setelah 1 menit</li>
+                <li>Retry ke-2: setelah 5 menit</li>
+                <li>Retry ke-3: setelah 30 menit</li>
+                <li>Retry ke-4: setelah 2 jam</li>
+                <li>Retry ke-5: setelah 12 jam</li>
+            </ul>
+            <p class="mt-2">Setelah 5 kali gagal, webhook ditandai <code class="text-xs px-1.5 py-0.5 bg-red-100 rounded">failed</code>. Anda bisa manual retry dari <a href="/merchant/webhook-logs.php" class="text-blue-600 font-medium hover:underline">Webhook Logs</a>.</p>
+        </div>
     </div>
 </div>
 
@@ -292,22 +389,22 @@ if (hash_equals($calculated, $signature)) {
 <div class="max-w-2xl space-y-6">
     <div class="bg-white rounded-xl border border-slate-200 p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-2">Test Webhook</h3>
-        <p class="text-sm text-slate-500 mb-4">Kirim test payload ke webhook URL untuk verifikasi koneksi dan signature.</p>
+        <p class="text-sm text-slate-500 mb-4">Kirim test payload ke webhook URL proyek aktif untuk verifikasi koneksi dan signature.</p>
 
         <?php if (empty($merchant['webhook_url'])): ?>
         <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            Webhook URL belum dikonfigurasi. <a href="?tab=webhook" class="font-medium underline">Set webhook URL</a> terlebih dahulu.
+            Webhook URL belum dikonfigurasi. <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>&tab=webhook" class="font-medium underline">Set webhook URL di Project Settings</a> terlebih dahulu.
         </div>
         <?php else: ?>
         <div class="p-3 bg-slate-50 rounded-lg mb-4">
-            <p class="text-xs text-slate-500">Target URL:</p>
+            <p class="text-xs text-slate-500">Target URL (dari Project Settings):</p>
             <p class="text-sm font-mono text-slate-700 break-all"><?= e($merchant['webhook_url']) ?></p>
         </div>
         <form method="POST" action="?tab=test" class="space-y-4">
             <?= csrf_field() ?>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Test Amount (Rp)</label>
-                <input type="number" name="test_amount" value="50000" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+                <input type="number" name="test_amount" value="50000" min="1000" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
             </div>
             <button type="submit" class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Kirim Test Webhook</button>
         </form>
@@ -330,7 +427,7 @@ if (hash_equals($calculated, $signature)) {
         <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">Error: <?= e($testResult['error']) ?></div>
         <?php endif; ?>
         <div class="mb-4">
-            <p class="text-xs font-medium text-slate-500 mb-1">Payload:</p>
+            <p class="text-xs font-medium text-slate-500 mb-1">Payload yang dikirim:</p>
             <pre class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto max-h-48"><?= e(json_encode($testResult['payload'], JSON_PRETTY_PRINT)) ?></pre>
         </div>
         <div class="mb-4">
@@ -339,7 +436,7 @@ if (hash_equals($calculated, $signature)) {
         </div>
         <?php if ($testResult['response']): ?>
         <div>
-            <p class="text-xs font-medium text-slate-500 mb-1">Response:</p>
+            <p class="text-xs font-medium text-slate-500 mb-1">Response dari server Anda:</p>
             <pre class="text-xs font-mono bg-slate-900 text-blue-300 rounded-lg p-4 overflow-x-auto max-h-32"><?= e($testResult['response']) ?></pre>
         </div>
         <?php endif; ?>
@@ -347,66 +444,16 @@ if (hash_equals($calculated, $signature)) {
     <?php endif; ?>
 </div>
 
-<?php elseif ($activeTab === 'history'): ?>
-<!-- ============ TAB: RIWAYAT PERUBAHAN ============ -->
-<div class="max-w-4xl">
-    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <?php if (empty($historyPagination['data'])): ?>
-        <div class="p-12 text-center text-slate-400"><p class="text-sm">Belum ada riwayat perubahan konfigurasi.</p></div>
-        <?php else: ?>
-        <div class="divide-y divide-slate-100">
-            <?php foreach ($historyPagination['data'] as $change): ?>
-            <div class="p-4 hover:bg-slate-50">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-slate-800"><?= e($change['change_label'] ?? $change['change_type']) ?></span>
-                            <?php
-                            $statusClass = match($change['status']) {
-                                'pending' => 'bg-amber-100 text-amber-800',
-                                'approved' => 'bg-emerald-100 text-emerald-800',
-                                'rejected' => 'bg-red-100 text-red-800',
-                                'canceled' => 'bg-slate-100 text-slate-600',
-                                default => 'bg-slate-100 text-slate-600',
-                            };
-                            ?>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium <?= $statusClass ?>"><?= ucfirst(str_replace('_', ' ', $change['status'])) ?></span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
-                            <div><span class="text-slate-400">Lama:</span><p class="font-mono text-slate-600 truncate"><?= e($change['old_value'] ?: '(kosong)') ?></p></div>
-                            <div><span class="text-slate-400">Baru:</span><p class="font-mono text-slate-800 truncate"><?= e($change['new_value'] ?: '(kosong)') ?></p></div>
-                        </div>
-                        <p class="text-xs text-slate-400 mt-1">Diajukan: <?= format_date($change['created_at']) ?></p>
-                    </div>
-                    <?php if ($change['status'] === 'pending'): ?>
-                    <form method="POST" action="?tab=history" onsubmit="return confirm('Batalkan perubahan ini?')">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="_action" value="cancel">
-                        <input type="hidden" name="change_id" value="<?= e($change['id']) ?>">
-                        <button class="px-3 py-1.5 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Batalkan</button>
-                    </form>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php if ($historyPagination['total_pages'] > 1): ?>
-        <div class="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-            <p class="text-xs text-slate-500">Halaman <?= $historyPagination['current_page'] ?> dari <?= $historyPagination['total_pages'] ?></p>
-            <div class="flex gap-1">
-                <?php if ($historyPagination['has_prev']): ?><a href="?tab=history&page=<?= $historyPagination['current_page']-1 ?>" class="px-3 py-1 rounded text-xs hover:bg-slate-100">&laquo;</a><?php endif; ?>
-                <?php if ($historyPagination['has_next']): ?><a href="?tab=history&page=<?= $historyPagination['current_page']+1 ?>" class="px-3 py-1 rounded text-xs hover:bg-slate-100">&raquo;</a><?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-        <?php endif; ?>
-    </div>
-</div>
-
 <?php endif; ?>
 
 <script>
-function copyToClipboard(id) { navigator.clipboard.writeText(document.getElementById(id).value).then(()=>showToast('Copied!')); }
+function copyCode(id) {
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.textContent).then(() => showToast('Copied!'));
+}
+function copyToClipboard(id) {
+    navigator.clipboard.writeText(document.getElementById(id).value).then(() => showToast('Copied!'));
+}
 </script>
 
 <?php require_once __DIR__ . '/../includes/merchant_footer.php'; ?>

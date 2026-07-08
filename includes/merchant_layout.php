@@ -14,6 +14,7 @@ $merchantMenus = [
     ['url' => '/merchant/payments.php', 'icon' => 'payments', 'label' => 'Pembayaran', 'page' => 'payments'],
     ['url' => '/merchant/wallet.php', 'icon' => 'wallet', 'label' => 'Wallet', 'page' => 'wallet'],
     ['url' => '/merchant/integration.php', 'icon' => 'integration', 'label' => 'Integrasi API', 'page' => 'integration'],
+    ['url' => '/merchant/webhook-logs.php', 'icon' => 'webhook', 'label' => 'Webhook Logs', 'page' => 'webhook-logs'],
     ['url' => '/merchant/staff.php', 'icon' => 'staff', 'label' => 'Staff', 'page' => 'staff'],
     ['url' => '/merchant/settings.php', 'icon' => 'settings', 'label' => 'Pengaturan', 'page' => 'settings'],
 ];
@@ -27,7 +28,7 @@ if ($userRole === 'staff_merchant') {
         'view_wallet' => ['wallet'],
         'view_withdrawals' => ['wallet'],
         'request_withdrawal' => ['wallet'],
-        'manage_webhook' => ['integration'],
+        'manage_webhook' => ['integration', 'webhook-logs'],
         'view_api_keys' => ['integration'],
         'view_payment_links' => ['payments'],
     ];
