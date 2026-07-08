@@ -83,7 +83,7 @@ class InvoiceService
         $merchant = $merchantRepo->find($invoice['merchant_id']);
 
         $items = is_string($invoice['items']) ? json_decode($invoice['items'], true) : ($invoice['items'] ?? []);
-        $appName = setting('app_name', 'PayGate Pro');
+        $appName = setting('app_name', 'Clipku Pay');
 
         // Generate HTML invoice
         $html = $this->buildInvoiceHtml($invoice, $merchant, $items, $appName);

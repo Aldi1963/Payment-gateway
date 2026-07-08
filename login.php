@@ -17,7 +17,7 @@ if (is_post()) {
     $controller->login();
 }
 
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 $flashes = get_flash();
 ?>
 <!DOCTYPE html>

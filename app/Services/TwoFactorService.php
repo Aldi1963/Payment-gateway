@@ -128,7 +128,7 @@ class TwoFactorService
      */
     public function getProvisioningUri(string $secret, string $email): string
     {
-        $issuer = setting('app_name', 'PayGate Pro');
+        $issuer = setting('app_name', 'Clipku Pay');
         $encodedIssuer = rawurlencode($issuer);
         $encodedEmail = rawurlencode($email);
         return "otpauth://totp/{$encodedIssuer}:{$encodedEmail}?secret={$secret}&issuer={$encodedIssuer}&digits={$this->codeLength}&period={$this->timeStep}";

@@ -52,7 +52,7 @@ if (is_post()) {
         CURLOPT_HTTPHEADER => [
             'Content-Type: application/json',
             'X-Signature: ' . $signature,
-            'User-Agent: PayGate-Webhook-Test/1.0',
+            'User-Agent: ClipkuPay-Webhook-Test/1.0',
         ],
     ]);
 

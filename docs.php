@@ -1,10 +1,10 @@
 <?php
 /**
  * Public API Documentation
- * Comprehensive developer docs for PayGate Pro API
+ * Comprehensive developer docs for Clipku Pay API
  */
 require_once __DIR__ . '/includes/init.php';
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 $appUrl = setting('app_url', app_url(''));
 $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 ?>

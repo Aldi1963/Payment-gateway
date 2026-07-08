@@ -1,42 +1,36 @@
 <?php
 /**
- * Merchant Layout - Sidebar + Main content
+ * Merchant Layout - Simplified Sidebar + Main content
+ * Menu: Dashboard, Pembayaran, Wallet, Integrasi API, Staff, Pengaturan
  */
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 $userName = $_SESSION['user_name'] ?? 'Merchant';
 $userRole = $_SESSION['user_role'] ?? 'merchant';
+$appName = setting('app_name', 'Clipku Pay');
 
 $merchantMenus = [
     ['url' => '/merchant/dashboard.php', 'icon' => 'dashboard', 'label' => 'Dashboard', 'page' => 'dashboard'],
-    ['url' => '/merchant/create-payment.php', 'icon' => 'create', 'label' => 'Buat Pembayaran', 'page' => 'create-payment'],
-    ['url' => '/merchant/transactions.php', 'icon' => 'receipt', 'label' => 'Transaksi', 'page' => 'transactions'],
-    ['url' => '/merchant/payment-links.php', 'icon' => 'link', 'label' => 'Payment Links', 'page' => 'payment-links'],
+    ['url' => '/merchant/payments.php', 'icon' => 'payments', 'label' => 'Pembayaran', 'page' => 'payments'],
     ['url' => '/merchant/wallet.php', 'icon' => 'wallet', 'label' => 'Wallet', 'page' => 'wallet'],
-    ['url' => '/merchant/withdraw.php', 'icon' => 'withdraw', 'label' => 'Tarik Dana', 'page' => 'withdraw'],
-    ['url' => '/merchant/withdraw-history.php', 'icon' => 'history', 'label' => 'Riwayat Penarikan', 'page' => 'withdraw-history'],
+    ['url' => '/merchant/integration.php', 'icon' => 'integration', 'label' => 'Integrasi API', 'page' => 'integration'],
     ['url' => '/merchant/staff.php', 'icon' => 'staff', 'label' => 'Staff', 'page' => 'staff'],
-    ['url' => '/merchant/api-keys.php', 'icon' => 'key', 'label' => 'API Keys', 'page' => 'api-keys'],
-    ['url' => '/merchant/webhook-settings.php', 'icon' => 'webhook', 'label' => 'Webhook & URL', 'page' => 'webhook-settings'],
-    ['url' => '/merchant/webhook-test.php', 'icon' => 'test', 'label' => 'Test Webhook', 'page' => 'webhook-test'],
-    ['url' => '/merchant/config-changes.php', 'icon' => 'shield', 'label' => 'Riwayat Perubahan', 'page' => 'config-changes'],
     ['url' => '/merchant/settings.php', 'icon' => 'settings', 'label' => 'Pengaturan', 'page' => 'settings'],
-    ['url' => '/merchant/profile.php', 'icon' => 'profile', 'label' => 'Profil', 'page' => 'profile'],
 ];
 
 // Staff merchant: filter menus based on permissions
 if ($userRole === 'staff_merchant') {
     $staffPerms = $_SESSION['permissions'] ?? [];
     $permMenuMap = [
-        'view_transactions' => ['transactions', 'payment-links'],
-        'create_payment' => ['create-payment'],
+        'view_transactions' => ['payments'],
+        'create_payment' => ['payments'],
         'view_wallet' => ['wallet'],
-        'view_withdrawals' => ['withdraw-history'],
-        'request_withdrawal' => ['withdraw'],
-        'manage_webhook' => ['webhook-settings'],
-        'view_api_keys' => ['api-keys'],
-        'view_payment_links' => ['payment-links'],
+        'view_withdrawals' => ['wallet'],
+        'request_withdrawal' => ['wallet'],
+        'manage_webhook' => ['integration'],
+        'view_api_keys' => ['integration'],
+        'view_payment_links' => ['payments'],
     ];
-    $allowedPages = ['dashboard', 'profile']; // always allowed
+    $allowedPages = ['dashboard', 'settings']; // always allowed
     foreach ($staffPerms as $perm) {
         if (isset($permMenuMap[$perm])) {
             $allowedPages = array_merge($allowedPages, $permMenuMap[$perm]);
@@ -50,18 +44,18 @@ if ($userRole === 'staff_merchant') {
     <!-- Sidebar -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-in-out">
         <div class="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
-            <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
             </div>
             <div>
-                <h1 class="text-lg font-bold">PayGate Pro</h1>
+                <h1 class="text-lg font-bold"><?= e($appName) ?></h1>
                 <p class="text-xs text-slate-400">Merchant Panel</p>
             </div>
         </div>
 
         <nav class="mt-4 px-3 space-y-1 overflow-y-auto max-h-[calc(100vh-180px)]">
             <?php foreach ($merchantMenus as $menu): ?>
-            <a href="<?= $menu['url'] ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors <?= $currentPage === $menu['page'] ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' ?>">
+            <a href="<?= $menu['url'] ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors <?= $currentPage === $menu['page'] ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' ?>">
                 <span class="w-5 h-5 flex items-center justify-center">
                     <?= get_merchant_icon($menu['icon']) ?>
                 </span>
@@ -72,7 +66,7 @@ if ($userRole === 'staff_merchant') {
 
         <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-sm font-bold">
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
                     <?= strtoupper(substr($userName, 0, 1)) ?>
                 </div>
                 <div class="flex-1 min-w-0">

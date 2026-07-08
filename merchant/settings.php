@@ -1,4 +1,8 @@
 <?php
+/**
+ * Pengaturan - Consolidated Page
+ * Tabs: Profil, Bisnis, Rekening Bank, Pembayaran, Notifikasi, Password
+ */
 require_once __DIR__ . '/../includes/init.php';
 Auth::requireMerchant();
 
@@ -13,11 +17,26 @@ $merchantId = Auth::merchantId();
 $merchant = $merchantRepo->find($merchantId);
 $user = $userRepo->find(Auth::id());
 
+$activeTab = $_GET['tab'] ?? 'profile';
+$validTabs = ['profile', 'business', 'bank', 'payment', 'notifications', 'password'];
+if (!in_array($activeTab, $validTabs)) $activeTab = 'profile';
+
 if (is_post()) {
     Auth::verifyCsrf();
-    $tab = $_POST['_tab'] ?? 'business';
+    $tab = $_POST['_tab'] ?? $activeTab;
 
-    if ($tab === 'business') {
+    if ($tab === 'profile') {
+        $updates = ['name' => sanitize($_POST['name'] ?? '')];
+        $userRepo->update(Auth::id(), $updates + ['updated_at' => now()]);
+        $merchantRepo->update($merchantId, [
+            'owner_name' => sanitize($_POST['name'] ?? ''),
+            'phone' => sanitize($_POST['phone'] ?? ''),
+            'updated_at' => now(),
+        ]);
+        $_SESSION['user_name'] = sanitize($_POST['name'] ?? $user['name']);
+        flash('success', 'Profil berhasil disimpan.');
+
+    } elseif ($tab === 'business') {
         $merchantRepo->update($merchantId, [
             'business_name' => sanitize($_POST['business_name'] ?? ''),
             'phone' => sanitize($_POST['phone'] ?? ''),
@@ -28,10 +47,8 @@ if (is_post()) {
             'description' => sanitize($_POST['description'] ?? ''),
             'updated_at' => now(),
         ]);
-        $_SESSION['user_name'] = sanitize($_POST['business_name'] ?? $merchant['business_name']);
         $auditService->log(Auth::id(), Auth::role(), $merchantId, 'settings_changed', 'Business info updated', []);
         flash('success', 'Informasi bisnis berhasil disimpan.');
-
 
     } elseif ($tab === 'bank') {
         $merchantRepo->update($merchantId, [
@@ -43,6 +60,15 @@ if (is_post()) {
         ]);
         flash('success', 'Informasi bank berhasil disimpan.');
 
+    } elseif ($tab === 'payment') {
+        $merchantRepo->update($merchantId, [
+            'payment_expiry_minutes' => (int)($_POST['payment_expiry_minutes'] ?? 60),
+            'default_redirect_url' => sanitize($_POST['default_redirect_url'] ?? ''),
+            'thank_you_message' => sanitize($_POST['thank_you_message'] ?? ''),
+            'updated_at' => now(),
+        ]);
+        flash('success', 'Pengaturan pembayaran berhasil disimpan.');
+
     } elseif ($tab === 'notifications') {
         $merchantRepo->update($merchantId, [
             'notif_email_payment' => isset($_POST['notif_email_payment']) ? '1' : '0',
@@ -53,23 +79,37 @@ if (is_post()) {
         ]);
         flash('success', 'Preferensi notifikasi berhasil disimpan.');
 
-    } elseif ($tab === 'payment') {
-        $merchantRepo->update($merchantId, [
-            'payment_expiry_minutes' => (int)($_POST['payment_expiry_minutes'] ?? 60),
-            'default_redirect_url' => sanitize($_POST['default_redirect_url'] ?? ''),
-            'thank_you_message' => sanitize($_POST['thank_you_message'] ?? ''),
-            'updated_at' => now(),
-        ]);
-        flash('success', 'Pengaturan pembayaran berhasil disimpan.');
+    } elseif ($tab === 'password') {
+        $currentPw = $_POST['current_password'] ?? '';
+        $newPw = $_POST['new_password'] ?? '';
+        $confirmPw = $_POST['password_confirm'] ?? '';
+
+        if (empty($currentPw) || empty($newPw)) {
+            flash('error', 'Semua field password harus diisi.');
+        } elseif (strlen($newPw) < 8) {
+            flash('error', 'Password baru minimal 8 karakter.');
+        } elseif ($newPw !== $confirmPw) {
+            flash('error', 'Konfirmasi password tidak cocok.');
+        } elseif (!password_verify($currentPw, $user['password_hash'])) {
+            flash('error', 'Password saat ini salah.');
+        } else {
+            $userRepo->update(Auth::id(), [
+                'password_hash' => password_hash($newPw, PASSWORD_DEFAULT),
+                'updated_at' => now(),
+            ]);
+            $auditService->log(Auth::id(), Auth::role(), $merchantId, 'password_changed', 'Password updated', []);
+            flash('success', 'Password berhasil diubah.');
+        }
     }
+
     redirect('/merchant/settings.php?tab=' . $tab);
 }
 
-// Reload data
+// Reload data after POST
 $merchant = $merchantRepo->find($merchantId);
-$activeTab = $_GET['tab'] ?? 'business';
+$user = $userRepo->find(Auth::id());
 
-// Get bank list from admin settings
+// Bank list
 require_once base_path('app/Repositories/SettingRepository.php');
 $settingRepo = new SettingRepository();
 $bankList = $settingRepo->get('bank_list', ['BCA','BNI','BRI','Mandiri','CIMB Niaga','BSI','Permata','DANA','OVO','GoPay','ShopeePay']);
@@ -80,14 +120,21 @@ require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/merchant_layout.php';
 ?>
 
-
 <!-- Tab Navigation -->
 <div class="border-b border-slate-200 mb-6">
     <nav class="flex gap-1 -mb-px overflow-x-auto">
-        <?php $tabs = ['business'=>'Bisnis','bank'=>'Rekening Bank','payment'=>'Pembayaran','notifications'=>'Notifikasi'];
-        foreach ($tabs as $tk => $tl): ?>
-        <a href="?tab=<?= $tk ?>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 <?= $activeTab === $tk ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700' ?>">
-            <?= $tl ?>
+        <?php
+        $tabs = [
+            'profile' => 'Profil',
+            'business' => 'Bisnis',
+            'bank' => 'Rekening Bank',
+            'payment' => 'Pembayaran',
+            'notifications' => 'Notifikasi',
+            'password' => 'Password',
+        ];
+        foreach ($tabs as $key => $label): ?>
+        <a href="?tab=<?= $key ?>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors <?= $activeTab === $key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300' ?>">
+            <?= $label ?>
         </a>
         <?php endforeach; ?>
     </nav>
@@ -96,9 +143,37 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 <div class="max-w-2xl">
 <div class="bg-white rounded-xl border border-slate-200 p-6">
 
-<?php if ($activeTab === 'business'): ?>
+
+<?php if ($activeTab === 'profile'): ?>
+<!-- ============ TAB: PROFIL ============ -->
+<h3 class="text-lg font-semibold text-slate-800 mb-4">Profil Akun</h3>
+<form method="POST" action="?tab=profile" class="space-y-4">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="profile">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
+        <input type="text" name="name" value="<?= e($user['name'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">No. Telepon</label>
+        <input type="text" name="phone" value="<?= e($merchant['phone'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input type="email" value="<?= e($user['email'] ?? '') ?>" disabled class="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-500">
+        <p class="text-xs text-slate-400 mt-1">Email tidak dapat diubah.</p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+        <input type="text" value="<?= ucfirst(str_replace('_', ' ', $user['role'] ?? '')) ?>" disabled class="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-500">
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Profil</button>
+</form>
+
+<?php elseif ($activeTab === 'business'): ?>
+<!-- ============ TAB: BISNIS ============ -->
 <h3 class="text-lg font-semibold text-slate-800 mb-4">Informasi Bisnis</h3>
-<form method="POST" class="space-y-4">
+<form method="POST" action="?tab=business" class="space-y-4">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="business">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -123,13 +198,14 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
         <div><label class="block text-sm font-medium text-slate-700 mb-1">Alamat</label>
             <input type="text" name="address" value="<?= e($merchant['address'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"></div>
     </div>
-    <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Simpan</button>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
 
 <?php elseif ($activeTab === 'bank'): ?>
+<!-- ============ TAB: REKENING BANK ============ -->
 <h3 class="text-lg font-semibold text-slate-800 mb-2">Informasi Rekening Bank</h3>
 <p class="text-sm text-slate-500 mb-4">Rekening ini digunakan untuk pencairan dana (withdrawal).</p>
-<form method="POST" class="space-y-4">
+<form method="POST" action="?tab=bank" class="space-y-4">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="bank">
     <div><label class="block text-sm font-medium text-slate-700 mb-1">Nama Bank</label>
@@ -141,63 +217,87 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
         </select></div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label class="block text-sm font-medium text-slate-700 mb-1">Nomor Rekening</label>
-            <input type="text" name="bank_account_number" value="<?= e($merchant['bank_account_number'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="1234567890"></div>
+            <input type="text" name="bank_account_number" value="<?= e($merchant['bank_account_number'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"></div>
         <div><label class="block text-sm font-medium text-slate-700 mb-1">Atas Nama</label>
-            <input type="text" name="bank_account_name" value="<?= e($merchant['bank_account_name'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Sesuai buku tabungan"></div>
+            <input type="text" name="bank_account_name" value="<?= e($merchant['bank_account_name'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"></div>
     </div>
     <div><label class="block text-sm font-medium text-slate-700 mb-1">Cabang <span class="text-slate-400">(opsional)</span></label>
         <input type="text" name="bank_branch" value="<?= e($merchant['bank_branch'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"></div>
-    <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Simpan Rekening</button>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Rekening</button>
 </form>
 
 
 <?php elseif ($activeTab === 'payment'): ?>
+<!-- ============ TAB: PEMBAYARAN ============ -->
 <h3 class="text-lg font-semibold text-slate-800 mb-2">Pengaturan Pembayaran</h3>
 <p class="text-sm text-slate-500 mb-4">Konfigurasi default untuk pembayaran baru.</p>
-<form method="POST" class="space-y-4">
+<form method="POST" action="?tab=payment" class="space-y-4">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="payment">
     <div><label class="block text-sm font-medium text-slate-700 mb-1">Expiry (menit)</label>
         <input type="number" name="payment_expiry_minutes" value="<?= e($merchant['payment_expiry_minutes'] ?? 60) ?>" min="5" max="1440" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-        <p class="text-xs text-slate-400 mt-1">Berapa menit sebelum payment link expired. Default: 60 menit.</p></div>
+        <p class="text-xs text-slate-400 mt-1">Berapa menit sebelum payment link expired. Default: 60.</p></div>
     <div><label class="block text-sm font-medium text-slate-700 mb-1">Default Redirect URL</label>
         <input type="url" name="default_redirect_url" value="<?= e($merchant['default_redirect_url'] ?? $merchant['redirect_url'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://yourdomain.com/thank-you">
-        <p class="text-xs text-slate-400 mt-1">Customer diarahkan ke sini setelah bayar (jika tidak diset per transaksi).</p></div>
+        <p class="text-xs text-slate-400 mt-1">Customer diarahkan ke sini setelah bayar.</p></div>
     <div><label class="block text-sm font-medium text-slate-700 mb-1">Pesan Thank You</label>
-        <textarea name="thank_you_message" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Terima kasih atas pembayaran Anda..."><?= e($merchant['thank_you_message'] ?? '') ?></textarea>
-        <p class="text-xs text-slate-400 mt-1">Ditampilkan di halaman sukses pembayaran.</p></div>
-    <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Simpan</button>
+        <textarea name="thank_you_message" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Terima kasih..."><?= e($merchant['thank_you_message'] ?? '') ?></textarea></div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
 
 <?php elseif ($activeTab === 'notifications'): ?>
+<!-- ============ TAB: NOTIFIKASI ============ -->
 <h3 class="text-lg font-semibold text-slate-800 mb-2">Preferensi Notifikasi</h3>
-<p class="text-sm text-slate-500 mb-4">Atur kapan dan bagaimana Anda ingin menerima notifikasi.</p>
-<form method="POST" class="space-y-5">
+<p class="text-sm text-slate-500 mb-4">Atur kapan dan bagaimana Anda menerima notifikasi.</p>
+<form method="POST" action="?tab=notifications" class="space-y-5">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="notifications">
     <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-        <p class="text-sm font-medium text-slate-700">Email Notification</p>
+        <p class="text-sm font-medium text-slate-700">Email</p>
         <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="notif_email_payment" value="1" <?= ($merchant['notif_email_payment'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-emerald-600">
-            <span class="text-sm text-slate-700">Kirim email saat pembayaran berhasil</span>
+            <input type="checkbox" name="notif_email_payment" value="1" <?= ($merchant['notif_email_payment'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Email saat pembayaran berhasil</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="notif_email_withdrawal" value="1" <?= ($merchant['notif_email_withdrawal'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-emerald-600">
-            <span class="text-sm text-slate-700">Kirim email saat withdrawal diproses</span>
+            <input type="checkbox" name="notif_email_withdrawal" value="1" <?= ($merchant['notif_email_withdrawal'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Email saat withdrawal diproses</span>
         </label>
     </div>
     <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-        <p class="text-sm font-medium text-slate-700">WhatsApp Notification</p>
+        <p class="text-sm font-medium text-slate-700">WhatsApp</p>
         <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="notif_wa_payment" value="1" <?= ($merchant['notif_wa_payment'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-emerald-600">
-            <span class="text-sm text-slate-700">Kirim WA saat pembayaran berhasil</span>
+            <input type="checkbox" name="notif_wa_payment" value="1" <?= ($merchant['notif_wa_payment'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">WA saat pembayaran berhasil</span>
         </label>
         <div><label class="block text-xs text-slate-500 mb-1">Nomor WhatsApp</label>
             <input type="text" name="notif_wa_number" value="<?= e($merchant['notif_wa_number'] ?? $merchant['phone'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="08123456789">
         </div>
     </div>
-    <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Simpan</button>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
+
+<?php elseif ($activeTab === 'password'): ?>
+<!-- ============ TAB: PASSWORD ============ -->
+<h3 class="text-lg font-semibold text-slate-800 mb-2">Ubah Password</h3>
+<p class="text-sm text-slate-500 mb-4">Pastikan password baru minimal 8 karakter dan berbeda dari yang lama.</p>
+<form method="POST" action="?tab=password" class="space-y-4">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="password">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Password Saat Ini</label>
+        <input type="password" name="current_password" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Masukkan password saat ini">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Password Baru</label>
+        <input type="password" name="new_password" required minlength="8" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Minimal 8 karakter">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Konfirmasi Password Baru</label>
+        <input type="password" name="password_confirm" required minlength="8" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Ulangi password baru">
+    </div>
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Ubah Password</button>
+</form>
+
 <?php endif; ?>
 
 </div>

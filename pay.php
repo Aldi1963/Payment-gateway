@@ -67,7 +67,7 @@ if (isset($_GET['check_status']) && $transaction) {
     exit;
 }
 
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 $merchantName = $merchant['business_name'] ?? $appName;
 $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran Anda!';
 ?>

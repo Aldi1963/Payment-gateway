@@ -42,7 +42,7 @@ if (is_post()) {
     redirect('/forgot-password.php');
 }
 
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 $flashes = get_flash();
 ?>
 <!DOCTYPE html>

@@ -6,7 +6,7 @@
 
 return [
     // Application
-    'app_name' => 'PayGate Pro',
+    'app_name' => 'Clipku Pay',
     'app_version' => '1.0.0',
     'app_url' => getenv('APP_URL') ?: 'http://localhost',
     'app_env' => getenv('APP_ENV') ?: 'production',

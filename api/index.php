@@ -70,7 +70,7 @@ switch ($action) {
     default:
         json_response([
             'success' => true,
-            'service' => 'PayGate Pro API',
+            'service' => 'Clipku Pay API',
             'version' => '1.0.0',
             'endpoints' => [
                 'POST ?action=create_transaction',

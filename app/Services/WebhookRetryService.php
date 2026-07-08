@@ -160,7 +160,7 @@ class WebhookRetryService
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'User-Agent: PayGate-Webhook/1.0',
+                'User-Agent: ClipkuPay-Webhook/1.0',
             ],
             CURLOPT_SSL_VERIFYPEER => true,
         ]);

@@ -13,7 +13,7 @@ if (is_post()) {
     $tab = $_POST['_tab'] ?? 'general';
     
     if ($tab === 'general') {
-        $settingRepo->set('app_name', sanitize($_POST['app_name'] ?? 'PayGate Pro'));
+        $settingRepo->set('app_name', sanitize($_POST['app_name'] ?? 'Clipku Pay'));
         $settingRepo->set('app_url', sanitize($_POST['app_url'] ?? ''));
         $settingRepo->set('app_description', sanitize($_POST['app_description'] ?? ''));
         $settingRepo->set('app_logo_url', sanitize($_POST['app_logo_url'] ?? ''));
@@ -120,7 +120,7 @@ require_once __DIR__ . '/../includes/admin_layout.php';
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Nama Aplikasi</label>
-            <input type="text" name="app_name" value="<?= e($s['app_name'] ?? 'PayGate Pro') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <input type="text" name="app_name" value="<?= e($s['app_name'] ?? 'Clipku Pay') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">App URL</label>

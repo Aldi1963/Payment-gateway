@@ -1,6 +1,6 @@
-# Panduan Instalasi PayGate Pro di cPanel Hosting
+# Panduan Instalasi Clipku Pay di cPanel Hosting
 
-Panduan ini menjelaskan langkah-langkah instalasi aplikasi PayGate Pro di shared hosting yang menggunakan cPanel. Membutuhkan PHP 8.2+ dan MySQL/MariaDB. Tidak membutuhkan akses SSH atau Composer.
+Panduan ini menjelaskan langkah-langkah instalasi aplikasi Clipku Pay di shared hosting yang menggunakan cPanel. Membutuhkan PHP 8.2+ dan MySQL/MariaDB. Tidak membutuhkan akses SSH atau Composer.
 
 ---
 
@@ -188,7 +188,7 @@ Anda akan melihat halaman instalasi dengan:
 
 | Field | Isi dengan |
 |-------|-----------|
-| Nama Admin | Nama Anda (contoh: `Admin PayGate`) |
+| Nama Admin | Nama Anda (contoh: `Admin Clipku`) |
 | Email Admin | Email valid (contoh: `admin@domainanda.com`) |
 | Password Admin | Minimal 8 karakter, harus mengandung huruf DAN angka |
 
@@ -328,7 +328,7 @@ Buka URL berikut dan pastikan berfungsi:
 
 | URL | Yang Seharusnya Muncul |
 |-----|----------------------|
-| `https://domainanda.com/` | Landing page PayGate Pro |
+| `https://domainanda.com/` | Landing page Clipku Pay |
 | `https://domainanda.com/login.php` | Form login |
 | `https://domainanda.com/register.php` | Form registrasi merchant |
 | `https://domainanda.com/admin/dashboard.php` | Dashboard admin (setelah login) |
@@ -482,4 +482,4 @@ Jika mengalami masalah yang tidak tercakup di panduan ini, periksa:
 
 ---
 
-*Dokumen ini dibuat untuk PayGate Pro v1.0 — Payment Gateway SaaS Multi Merchant*
+*Dokumen ini dibuat untuk Clipku Pay v1.0 — Payment Gateway SaaS Multi Merchant*

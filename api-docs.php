@@ -4,7 +4,7 @@
  * Auto-generated endpoint reference with Try It feature
  */
 require_once __DIR__ . '/includes/init.php';
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 $appUrl = setting('app_url', app_url(''));
 ?>
 <!DOCTYPE html>

@@ -9,7 +9,7 @@ if (Auth::check()) {
         redirect('/merchant/dashboard.php');
     }
 }
-$appName = setting('app_name', 'PayGate Pro');
+$appName = setting('app_name', 'Clipku Pay');
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">

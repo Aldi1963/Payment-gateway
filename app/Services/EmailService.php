@@ -20,7 +20,7 @@ class EmailService
     {
         $this->enabled = setting('notif_email_enabled', '0') === '1';
         $this->fromEmail = setting('notif_email_from', 'noreply@paygate.local');
-        $this->fromName = setting('app_name', 'PayGate Pro');
+        $this->fromName = setting('app_name', 'Clipku Pay');
     }
 
     /**
@@ -109,7 +109,7 @@ class EmailService
             'Content-Type: text/html; charset=UTF-8',
             "From: {$this->fromName} <{$this->fromEmail}>",
             "Reply-To: {$this->fromEmail}",
-            'X-Mailer: PayGate-Pro/1.0',
+            'X-Mailer: ClipkuPay/1.0',
         ];
 
         $result = @mail($to, $subject, $htmlBody, implode("\r\n", $headers));

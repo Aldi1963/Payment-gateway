@@ -39,7 +39,7 @@ if ($userRole === 'finance') {
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
             </div>
             <div>
-                <h1 class="text-lg font-bold">PayGate Pro</h1>
+                <h1 class="text-lg font-bold">Clipku Pay</h1>
                 <p class="text-xs text-slate-400">Admin Panel</p>
             </div>
         </div>

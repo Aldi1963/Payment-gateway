@@ -1,6 +1,6 @@
 <?php
 /**
- * PayGate Pro - Installation Script
+ * Clipku Pay - Installation Script
  * Run once to initialize database and create Super Admin account.
  * Auto-locks after successful installation (checks DB for existing admin).
  * DELETE THIS FILE AFTER INSTALLATION for additional security!
@@ -153,14 +153,14 @@ if ($step === 'install' && !$alreadyInstalled) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Install - PayGate Pro</title>
+    <title>Install - Clipku Pay</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
 </head>
 <body class="min-h-screen font-sans bg-slate-100 flex items-center justify-center p-4">
 <div class="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
-    <h1 class="text-2xl font-bold text-slate-800 mb-2">PayGate Pro - Instalasi</h1>
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Clipku Pay - Instalasi</h1>
 
     <?php if ($success): ?>
     <div class="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">

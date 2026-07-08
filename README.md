@@ -1,4 +1,4 @@
-# PayGate Pro - Payment Gateway SaaS Multi Merchant
+# Clipku Pay - Payment Gateway SaaS Multi Merchant
 
 Platform payment gateway self-hosted berbasis PHP Native 8.2+ dengan integrasi AldiQRIS untuk pembayaran QRIS. Mendukung multi merchant, wallet management, withdrawal, settlement, dan role-based access control.
 
