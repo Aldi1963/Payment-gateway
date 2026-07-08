@@ -307,10 +307,35 @@ berurutan sesuai nama file.
 
 ### Authentication
 
-Semua endpoint menggunakan Bearer token:
+API menggunakan **satu API key per akun** (berlaku untuk semua proyek). Ambil di
+**Pengaturan › API Key**. Sertakan sebagai Bearer token:
+
 ```
-Authorization: Bearer YOUR_MERCHANT_API_KEY
+Authorization: Bearer YOUR_ACCOUNT_API_KEY
 ```
+
+### Memilih proyek tujuan
+
+Karena satu key dipakai untuk banyak proyek, tentukan proyek tujuan tiap request
+via header (atau query param):
+
+```
+X-Project-Id: <merchant_id>      # berdasarkan ID proyek
+X-Project: <slug>                # atau berdasarkan slug proyek
+```
+
+Aturan:
+- Jika akun hanya punya **1 proyek**, header ini opsional.
+- Jika akun punya **>1 proyek** dan header tidak disertakan, request ditolak `400`
+  untuk mencegah salah tujuan.
+
+> **Kompatibilitas:** API key lama per-proyek (`merchants.api_key`) tetap berlaku.
+> Untuk key lama, proyek ditentukan otomatis dari key tersebut (tanpa header).
+
+### Webhook Signing Secret
+
+Verifikasi tanda tangan webhook (`X-Signature`) tetap memakai **secret per-proyek**
+(bukan API key akun). Ambil di **Project Settings › Webhook › Webhook Signing Secret**.
 
 ### Endpoints
 
@@ -320,6 +345,16 @@ Authorization: Bearer YOUR_MERCHANT_API_KEY
 | GET | `/api/index.php?action=get_transaction&order_id=XXX` | Cek status transaksi |
 | GET | `/api/index.php?action=wallet` | Lihat saldo wallet |
 | GET | `/api/index.php?action=withdrawals` | Lihat riwayat withdrawal |
+
+Contoh (curl):
+
+```bash
+curl -X POST "https://pay.clipku.com/api/v1/transactions" \
+  -H "Authorization: Bearer YOUR_ACCOUNT_API_KEY" \
+  -H "X-Project-Id: db103f96-6b83-406b-b5e3-2720964d867e" \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"INV-001","amount":50000,"customer_name":"Budi"}'
+```
 
 ### Response Format
 

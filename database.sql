@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `name` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
+    `api_key` VARCHAR(70) NULL DEFAULT NULL,
     `role` ENUM('super_admin','admin','finance','support','merchant','staff_merchant') NOT NULL DEFAULT 'merchant',
     `status` ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
     `permissions` JSON NULL DEFAULT NULL,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_users_email` (`email`),
+    UNIQUE KEY `uk_users_api_key` (`api_key`),
     KEY `idx_users_merchant_id` (`merchant_id`),
     KEY `idx_users_role` (`role`),
     KEY `idx_users_status` (`status`)
