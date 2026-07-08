@@ -1,13 +1,11 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
+# PayGate Pro - PHP Native CI/CD Pipeline
+# Runs syntax checks, security analysis, and code quality validation
 
-name: Symfony
+name: PHP CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main" ]
 
@@ -15,33 +13,142 @@ permissions:
   contents: read
 
 jobs:
-  symfony-tests:
+  php-checks:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3']
+
     steps:
-    #  To automatically get bug fixes and new Php versions for shivammathur/setup-php,
-    # change this to (see https://github.com/shivammathur/setup-php#bookmark-versioning):
-    # uses: shivammathur/setup-php@v2
-    - uses: shivammathur/setup-php@2cb9b829437ee246e9b3cac53555a39208ca6d28
-      with:
-        php-version: '8.0'
-    - uses: actions/checkout@v4
-    - name: Copy .env.test.local
-      run: php -r "file_exists('.env.test.local') || copy('.env.test', '.env.test.local');"
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
-    - name: Install Dependencies
-      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-    - name: Create Database
-      run: |
-        mkdir -p data
-        touch data/database.sqlite
-    - name: Execute tests (Unit and Feature tests) via PHPUnit
-      env:
-        DATABASE_URL: sqlite:///%kernel.project_dir%/data/database.sqlite
-      run: vendor/bin/phpunit
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, json, mbstring, openssl, pdo, pdo_mysql
+          coverage: none
+
+      - name: PHP Syntax Check
+        run: |
+          echo "=== Checking PHP syntax ==="
+          find . -name "*.php" -not -path "./vendor/*" -not -path "./.git/*" | while read file; do
+            php -l "$file" || exit 1
+          done
+          echo "=== All PHP files pass syntax check ==="
+
+      - name: Check PHP Extensions Requirements
+        run: |
+          echo "=== Checking required extensions ==="
+          php -m | grep -i curl
+          php -m | grep -i json
+          php -m | grep -i mbstring
+          php -m | grep -i openssl
+          php -m | grep -i pdo
+          echo "=== All required extensions available ==="
+
+      - name: Validate Configuration Files
+        run: |
+          echo "=== Validating config files ==="
+          php -l config/app.php
+          php -l config/database.php
+          php -l config/gateway.php
+          echo "=== Config files valid ==="
+
+      - name: Check for Security Issues
+        run: |
+          echo "=== Basic security checks ==="
+          # Check for eval() usage (potential security risk)
+          if grep -rn "eval(" --include="*.php" . --exclude-dir=vendor --exclude-dir=.git; then
+            echo "WARNING: eval() usage detected. Please review."
+          fi
+          # Check for direct $_GET/$_POST in SQL (potential SQL injection)
+          if grep -rn "query.*\\\$_\(GET\|POST\|REQUEST\)" --include="*.php" . --exclude-dir=vendor --exclude-dir=.git; then
+            echo "ERROR: Direct superglobal in query detected!"
+            exit 1
+          fi
+          # Check for shell_exec or exec without proper input validation
+          if grep -rn "\(shell_exec\|passthru\|system\)(" --include="*.php" . --exclude-dir=vendor --exclude-dir=.git; then
+            echo "WARNING: Shell execution functions detected. Please review."
+          fi
+          echo "=== Security checks completed ==="
+
+      - name: Verify Directory Structure
+        run: |
+          echo "=== Verifying project structure ==="
+          test -d app/Controllers || (echo "Missing app/Controllers" && exit 1)
+          test -d app/Services || (echo "Missing app/Services" && exit 1)
+          test -d app/Repositories || (echo "Missing app/Repositories" && exit 1)
+          test -d app/Channels || (echo "Missing app/Channels" && exit 1)
+          test -d config || (echo "Missing config" && exit 1)
+          test -f database.sql || (echo "Missing database.sql" && exit 1)
+          test -f api/index.php || (echo "Missing api/index.php" && exit 1)
+          echo "=== Project structure valid ==="
+
+      - name: MySQL Schema Validation
+        run: |
+          echo "=== Validating SQL schema syntax ==="
+          # Basic SQL syntax validation
+          if grep -c "CREATE TABLE" database.sql; then
+            echo "Found CREATE TABLE statements"
+          else
+            echo "ERROR: No CREATE TABLE found in database.sql"
+            exit 1
+          fi
+          # Check for common SQL issues
+          if grep -n "VARCHAR()" database.sql; then
+            echo "ERROR: Empty VARCHAR() detected"
+            exit 1
+          fi
+          echo "=== SQL schema appears valid ==="
+
+  code-quality:
+    runs-on: ubuntu-latest
+    needs: php-checks
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json, mbstring, openssl, pdo
+          coverage: none
+
+      - name: Check File Permissions
+        run: |
+          echo "=== Checking file permissions ==="
+          # Ensure no world-writable PHP files
+          find . -name "*.php" -perm /o+w -not -path "./.git/*" | while read file; do
+            echo "ERROR: World-writable PHP file: $file"
+            exit 1
+          done
+          echo "=== File permissions OK ==="
+
+      - name: Check for Debug Code
+        run: |
+          echo "=== Checking for debug code ==="
+          # Check for var_dump, print_r, die() with debug messages
+          ISSUES=0
+          if grep -rn "var_dump\|print_r\|dd(" --include="*.php" . --exclude-dir=vendor --exclude-dir=.git | grep -v "// debug" | grep -v "// @debug"; then
+            echo "WARNING: Debug output functions found (review if intentional)"
+            ISSUES=$((ISSUES+1))
+          fi
+          if [ $ISSUES -gt 5 ]; then
+            echo "ERROR: Too many debug statements found"
+            exit 1
+          fi
+          echo "=== Debug code check completed ==="
+
+      - name: Verify API Endpoints Load
+        run: |
+          echo "=== Verifying API files are parseable ==="
+          php -l api/index.php
+          for f in app/Controllers/*.php; do
+            php -l "$f" || exit 1
+          done
+          for f in app/Services/*.php; do
+            php -l "$f" || exit 1
+          done
+          echo "=== All API files pass ==="

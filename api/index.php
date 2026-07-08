@@ -1,13 +1,24 @@
 <?php
 /**
- * API Endpoint
+ * API Endpoint Router
  * Handles internal merchant API and admin AJAX requests
  * 
+ * Supported API versions:
+ *   v1 (current) - Query parameter based: ?action=xxx
+ *   v1 path-based: /api/v1/transactions, etc.
+ * 
  * Merchant API (Bearer auth):
- *   POST ?action=create_transaction
- *   GET  ?action=get_transaction&order_id=XXX
- *   GET  ?action=wallet
- *   GET  ?action=withdrawals
+ *   POST ?action=create_transaction         Create new transaction
+ *   GET  ?action=get_transaction&order_id=X Get transaction by order_id
+ *   GET  ?action=transactions               List transactions (paginated)
+ *   GET  ?action=transaction_status&order_id=X  Quick status check
+ *   GET  ?action=wallet                     Get wallet balance
+ *   GET  ?action=withdrawals                List withdrawals (paginated)
+ *   POST ?action=create_withdrawal          Create withdrawal request
+ *   POST ?action=refund                     Create refund
+ *   GET  ?action=settlements                List settlements (paginated)
+ *   GET  ?action=stats                      Get merchant statistics
+ *   POST ?action=webhook_test               Test webhook delivery
  * 
  * Internal AJAX (session auth):
  *   GET  ?action=tx_detail&id=XXX
@@ -15,8 +26,23 @@
 
 require_once dirname(__DIR__) . '/includes/init.php';
 
+// Set CORS headers
+$allowedOrigins = setting('cors_allowed_origins', '*');
+header('Access-Control-Allow-Origin: ' . $allowedOrigins);
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, Idempotency-Key, X-Idempotency-Key, X-CSRF-Token');
+header('Access-Control-Expose-Headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-Idempotency-Replayed');
+header('Access-Control-Max-Age: 86400');
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
+header('X-API-Version: 2.0.0');
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
@@ -44,9 +70,10 @@ require_once base_path('app/Controllers/ApiController.php');
 $apiController = new ApiController();
 
 switch ($action) {
+    // === TRANSACTIONS ===
     case 'create_transaction':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            json_response(['error' => 'Method not allowed'], 405);
+            json_response(['error' => 'Method not allowed', 'message' => 'Use POST method'], 405);
         }
         $apiController->createTransaction();
         break;
@@ -59,25 +86,124 @@ switch ($action) {
         $apiController->getTransaction($orderId);
         break;
 
+    case 'transactions':
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use GET method'], 405);
+        }
+        $apiController->listTransactions();
+        break;
+
+    case 'transaction_status':
+        $orderId = $_GET['order_id'] ?? '';
+        if (empty($orderId)) {
+            json_response(['error' => 'Missing order_id parameter'], 400);
+        }
+        $apiController->getTransactionStatus($orderId);
+        break;
+
+    // === WALLET ===
     case 'wallet':
         $apiController->getWallet();
         break;
 
+    // === WITHDRAWALS ===
     case 'withdrawals':
-        $apiController->getWithdrawals();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $apiController->createWithdrawal();
+        } else {
+            $apiController->getWithdrawals();
+        }
         break;
 
+    case 'create_withdrawal':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use POST method'], 405);
+        }
+        $apiController->createWithdrawal();
+        break;
+
+    // === REFUNDS ===
+    case 'refund':
+    case 'refunds':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use POST method'], 405);
+        }
+        $apiController->createRefund();
+        break;
+
+    // === SETTLEMENTS ===
+    case 'settlements':
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use GET method'], 405);
+        }
+        $apiController->getSettlements();
+        break;
+
+    // === STATISTICS ===
+    case 'stats':
+    case 'statistics':
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use GET method'], 405);
+        }
+        $apiController->getStats();
+        break;
+
+    // === WEBHOOK TEST ===
+    case 'webhook_test':
+    case 'test_webhook':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_response(['error' => 'Method not allowed', 'message' => 'Use POST method'], 405);
+        }
+        $apiController->testWebhook();
+        break;
+
+    // === DEFAULT / INFO ===
     default:
         json_response([
             'success' => true,
-            'service' => 'Clipku Pay API',
-            'version' => '1.0.0',
+            'service' => setting('app_name', 'PayGate Pro') . ' API',
+            'version' => '2.0.0',
             'endpoints' => [
-                'POST ?action=create_transaction',
-                'GET  ?action=get_transaction&order_id=XXX',
-                'GET  ?action=wallet',
-                'GET  ?action=withdrawals',
+                'transactions' => [
+                    'POST ?action=create_transaction' => 'Create new transaction',
+                    'GET  ?action=get_transaction&order_id=XXX' => 'Get transaction detail',
+                    'GET  ?action=transactions' => 'List transactions (paginated)',
+                    'GET  ?action=transaction_status&order_id=XXX' => 'Quick status check',
+                ],
+                'wallet' => [
+                    'GET  ?action=wallet' => 'Get wallet balance',
+                ],
+                'withdrawals' => [
+                    'GET  ?action=withdrawals' => 'List withdrawals (paginated)',
+                    'POST ?action=create_withdrawal' => 'Create withdrawal request',
+                ],
+                'refunds' => [
+                    'POST ?action=refund' => 'Create refund',
+                ],
+                'settlements' => [
+                    'GET  ?action=settlements' => 'List settlements (paginated)',
+                ],
+                'statistics' => [
+                    'GET  ?action=stats' => 'Get merchant statistics',
+                ],
+                'webhooks' => [
+                    'POST ?action=webhook_test' => 'Test webhook delivery',
+                ],
+                'health' => [
+                    'GET  /api/health.php' => 'System health check (no auth required)',
+                ],
             ],
             'auth' => 'Bearer YOUR_API_KEY',
+            'headers' => [
+                'Authorization' => 'Bearer <api_key> (required)',
+                'Content-Type' => 'application/json (for POST requests)',
+                'Idempotency-Key' => '<unique-key> (optional, for POST requests)',
+            ],
+            'pagination' => [
+                'page' => 'Page number (default: 1)',
+                'per_page' => 'Items per page (default: 20, max: 100)',
+                'sort_by' => 'Sort field (varies per endpoint)',
+                'sort_order' => 'asc or desc (default: desc)',
+            ],
         ]);
 }
