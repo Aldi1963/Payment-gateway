@@ -18,8 +18,11 @@ $merchant = $merchantRepo->find($merchantId);
 $user = $userRepo->find(Auth::id());
 
 $activeTab = $_GET['tab'] ?? 'profile';
-$validTabs = ['profile', 'business', 'bank', 'payment', 'notifications', 'password'];
+$validTabs = ['profile', 'business', 'bank', 'payment', 'notifications', 'whatsapp', 'password'];
 if (!in_array($activeTab, $validTabs)) $activeTab = 'profile';
+
+require_once base_path('app/Controllers/MerchantController.php');
+$merchantController = new MerchantController();
 
 if (is_post()) {
     Auth::verifyCsrf();
@@ -79,6 +82,16 @@ if (is_post()) {
         ]);
         flash('success', 'Preferensi notifikasi berhasil disimpan.');
 
+    } elseif ($tab === 'whatsapp') {
+        // Handle test action vs save
+        if (($_POST['wa_action'] ?? '') === 'test') {
+            $result = $merchantController->testWa($_POST['test_phone'] ?? '');
+            flash($result['success'] ? 'success' : 'error', $result['message']);
+        } else {
+            $result = $merchantController->saveWaConfig($_POST);
+            flash($result['success'] ? 'success' : 'error', $result['message']);
+        }
+
     } elseif ($tab === 'password') {
         $currentPw = $_POST['current_password'] ?? '';
         $newPw = $_POST['new_password'] ?? '';
@@ -109,6 +122,9 @@ if (is_post()) {
 $merchant = $merchantRepo->find($merchantId);
 $user = $userRepo->find(Auth::id());
 
+// WhatsApp config for the active project
+$waConfig = $merchantController->getWaConfig();
+
 // Bank list
 require_once base_path('app/Repositories/SettingRepository.php');
 $settingRepo = new SettingRepository();
@@ -130,6 +146,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
             'bank' => 'Rekening Bank',
             'payment' => 'Pembayaran',
             'notifications' => 'Notifikasi',
+            'whatsapp' => 'Integrasi WhatsApp',
             'password' => 'Password',
         ];
         foreach ($tabs as $key => $label): ?>
@@ -275,6 +292,115 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     </div>
     <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
+
+<?php elseif ($activeTab === 'whatsapp'): ?>
+<!-- ============ TAB: INTEGRASI WHATSAPP ============ -->
+<h3 class="text-lg font-semibold text-slate-800 mb-2">Integrasi WhatsApp</h3>
+<p class="text-sm text-slate-500 mb-4">Konfigurasi API WhatsApp untuk proyek <strong><?= e($merchant['business_name'] ?? '') ?></strong>. Setiap proyek punya integrasi terpisah.</p>
+
+<?php if (!empty($waConfig['total_sent'])): ?>
+<div class="mb-4 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
+    Total pesan terkirim: <strong><?= number_format((int)$waConfig['total_sent']) ?></strong>
+    <?php if (!empty($waConfig['last_sent_at'])): ?> &middot; Terakhir: <?= format_date($waConfig['last_sent_at'], 'd/m/Y H:i') ?><?php endif; ?>
+    <?php if (!empty($waConfig['last_error'])): ?><br><span class="text-red-500">Error terakhir: <?= e($waConfig['last_error']) ?></span><?php endif; ?>
+</div>
+<?php endif; ?>
+
+<form method="POST" action="?tab=whatsapp" class="space-y-4">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_tab" value="whatsapp">
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Provider</label>
+        <select name="provider" id="waProvider" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm" onchange="updateProviderHint()">
+            <?php
+            $providers = ['fonnte' => 'Fonnte', 'wablas' => 'Wablas', 'zenziva' => 'Zenziva', 'custom' => 'Custom API'];
+            foreach ($providers as $v => $l): ?>
+            <option value="<?= $v ?>" <?= ($waConfig['provider'] ?? 'fonnte') === $v ? 'selected' : '' ?>><?= $l ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">API URL</label>
+        <input type="url" name="api_url" value="<?= e($waConfig['api_url'] ?? 'https://api.fonnte.com/send') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="https://api.fonnte.com/send">
+        <p class="text-xs text-slate-400 mt-1" id="providerHint">Endpoint API dari provider WA Anda.</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">API Key / Token</label>
+            <input type="text" name="api_key" value="<?= e($waConfig['api_key'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="Token dari provider">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">API Secret <span class="text-slate-400">(Zenziva/opsional)</span></label>
+            <input type="text" name="api_secret" value="<?= e($waConfig['api_secret'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="Passkey (jika perlu)">
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Pengirim <span class="text-slate-400">(opsional)</span></label>
+            <input type="text" name="sender_number" value="<?= e($waConfig['sender_number'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="628xxx">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Admin Notif <span class="text-slate-400">(opsional)</span></label>
+            <input type="text" name="notify_admin_number" value="<?= e($waConfig['notify_admin_number'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="628xxx (WA masuk saat ada bayaran)">
+        </div>
+    </div>
+
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="is_active" value="1" <?= (int)($waConfig['is_active'] ?? 1) === 1 ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Aktifkan integrasi WhatsApp</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="notify_on_payment" value="1" <?= (int)($waConfig['notify_on_payment'] ?? 1) === 1 ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Kirim WA ke customer saat pembayaran berhasil</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="notify_on_withdrawal" value="1" <?= (int)($waConfig['notify_on_withdrawal'] ?? 0) === 1 ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+            <span class="text-sm text-slate-700">Kirim WA saat withdrawal diproses</span>
+        </label>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Template Pesan Pembayaran</label>
+        <textarea name="message_template_payment" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"><?= e($waConfig['message_template_payment'] ?? 'Halo {customer}! Pembayaran order *{order_id}* sebesar *{amount}* telah *{status}*. Terima kasih telah bertransaksi di {project}.') ?></textarea>
+        <p class="text-xs text-slate-400 mt-1">Variabel: <code>{customer}</code>, <code>{order_id}</code>, <code>{amount}</code>, <code>{net}</code>, <code>{status}</code>, <code>{project}</code></p>
+    </div>
+
+    <div class="flex gap-2">
+        <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Konfigurasi</button>
+    </div>
+</form>
+
+<!-- Test WA -->
+<div class="mt-6 pt-6 border-t border-slate-200">
+    <h4 class="text-sm font-semibold text-slate-800 mb-2">Test Kirim WhatsApp</h4>
+    <form method="POST" action="?tab=whatsapp" class="flex gap-2">
+        <?= csrf_field() ?>
+        <input type="hidden" name="_tab" value="whatsapp">
+        <input type="hidden" name="wa_action" value="test">
+        <input type="text" name="test_phone" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Nomor tujuan test, cth: 08123456789" required>
+        <button type="submit" class="px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 whitespace-nowrap">Test Kirim</button>
+    </form>
+    <p class="text-xs text-slate-400 mt-2">Simpan konfigurasi terlebih dahulu sebelum melakukan test.</p>
+</div>
+
+<script>
+function updateProviderHint() {
+    var p = document.getElementById('waProvider').value;
+    var hints = {
+        'fonnte': 'Endpoint: https://api.fonnte.com/send — Token dari dashboard Fonnte.',
+        'wablas': 'Endpoint: https://domain-wablas.com — Token dari dashboard Wablas.',
+        'zenziva': 'Endpoint Zenziva — isi Userkey di API Key & Passkey di API Secret.',
+        'custom': 'Endpoint custom Anda. Body JSON: {to, message, sender}, header Bearer API Key.'
+    };
+    document.getElementById('providerHint').textContent = hints[p] || '';
+}
+updateProviderHint();
+</script>
 
 <?php elseif ($activeTab === 'password'): ?>
 <!-- ============ TAB: PASSWORD ============ -->

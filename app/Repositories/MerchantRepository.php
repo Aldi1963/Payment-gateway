@@ -58,6 +58,26 @@ class MerchantRepository extends BaseRepository
     }
 
     /**
+     * Find merchant/project by slug
+     */
+    public function findBySlug(string $slug): ?array
+    {
+        return $this->fetchOne("SELECT * FROM `{$this->table}` WHERE `slug` = :slug LIMIT 1", [
+            'slug' => $slug
+        ]);
+    }
+
+    /**
+     * Find projects owned by a specific user
+     */
+    public function findByOwner(string $ownerId): array
+    {
+        return $this->query("SELECT * FROM `{$this->table}` WHERE `owner_id` = :oid ORDER BY `created_at` ASC", [
+            'oid' => $ownerId
+        ]);
+    }
+
+    /**
      * Get active merchants
      */
     public function findActive(): array

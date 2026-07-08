@@ -399,17 +399,12 @@ class TransactionService
                 }
             }
 
-            // WhatsApp notification
-            if (setting('notif_wa_enabled', '0') === '1' && ($merchant['notif_wa_payment'] ?? '0') === '1') {
-                $waNumber = $merchant['notif_wa_number'] ?? $merchant['phone'] ?? '';
-                if (!empty($waNumber)) {
-                    require_once base_path('app/Services/NotificationService.php');
-                    $notifService = new NotificationService();
-                    $notifService->sendWhatsApp($waNumber, 
-                        "Pembayaran masuk! Order: {$transaction['order_id']}, Amount: " . format_currency($transaction['amount'])
-                    );
-                }
-            }
+            // WhatsApp notification (per-project config via WhatsAppService)
+            // Uses the project's own WA provider/API key. Sends to the customer
+            // and optionally the project admin number, based on merchant_wa_configs.
+            require_once base_path('app/Services/WhatsAppService.php');
+            $waService = new WhatsAppService();
+            $waService->sendPaymentNotification($transaction['merchant_id'], $transaction);
         } catch (\Throwable $e) {
             app_log("Notification error: " . $e->getMessage(), 'ERROR');
         }

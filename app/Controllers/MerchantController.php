@@ -7,10 +7,13 @@
 require_once base_path('app/Helpers.php');
 require_once base_path('app/Auth.php');
 require_once base_path('app/Repositories/MerchantRepository.php');
+require_once base_path('app/Repositories/WaConfigRepository.php');
 require_once base_path('app/Services/TransactionService.php');
 require_once base_path('app/Services/WalletService.php');
 require_once base_path('app/Services/WithdrawalService.php');
 require_once base_path('app/Services/AuditLogService.php');
+require_once base_path('app/Services/ProjectService.php');
+require_once base_path('app/Services/WhatsAppService.php');
 
 class MerchantController
 {
@@ -19,6 +22,9 @@ class MerchantController
     private WalletService $walletService;
     private WithdrawalService $withdrawalService;
     private AuditLogService $auditService;
+    private ProjectService $projectService;
+    private WhatsAppService $waService;
+    private WaConfigRepository $waConfigRepo;
 
     public function __construct()
     {
@@ -27,6 +33,135 @@ class MerchantController
         $this->walletService = new WalletService();
         $this->withdrawalService = new WithdrawalService();
         $this->auditService = new AuditLogService();
+        $this->projectService = new ProjectService();
+        $this->waService = new WhatsAppService();
+        $this->waConfigRepo = new WaConfigRepository();
+    }
+
+    // ==============================
+    // PROJECTS (MULTI-STORE)
+    // ==============================
+
+    /**
+     * List all projects owned by the current user.
+     */
+    public function listProjects(): array
+    {
+        return $this->projectService->listByUser(Auth::id());
+    }
+
+    /**
+     * Create a new project (store).
+     * Input: name (nama toko), webhook_url (opsional), ip_whitelist (opsional).
+     */
+    public function createProject(array $data): array
+    {
+        return $this->projectService->create(Auth::id(), $data);
+    }
+
+    /**
+     * Switch the active project (no logout required).
+     */
+    public function switchProject(string $merchantId): array
+    {
+        return $this->projectService->switchActive(Auth::id(), $merchantId);
+    }
+
+    /**
+     * Update a project's basic settings.
+     */
+    public function updateProject(string $merchantId, array $data): array
+    {
+        return $this->projectService->update(Auth::id(), $merchantId, $data);
+    }
+
+    /**
+     * Get the currently active project.
+     */
+    public function getActiveProject(): ?array
+    {
+        return $this->projectService->getActive(Auth::id());
+    }
+
+    // ==============================
+    // WHATSAPP INTEGRATION (per project)
+    // ==============================
+
+    /**
+     * Get WA config for the active project.
+     */
+    public function getWaConfig(): ?array
+    {
+        return $this->waConfigRepo->findByMerchant(Auth::merchantId());
+    }
+
+    /**
+     * Save (create/update) WA config for the active project.
+     */
+    public function saveWaConfig(array $data): array
+    {
+        $merchantId = Auth::merchantId();
+        if (!$merchantId || !$this->projectService->userOwns(Auth::id(), $merchantId)) {
+            return ['success' => false, 'message' => 'Proyek aktif tidak valid.'];
+        }
+
+        $provider = $data['provider'] ?? 'fonnte';
+        $validProviders = ['fonnte', 'wablas', 'zenziva', 'custom'];
+        if (!in_array($provider, $validProviders)) {
+            return ['success' => false, 'message' => 'Provider WA tidak valid.'];
+        }
+
+        $apiUrl = trim($data['api_url'] ?? '');
+        if ($apiUrl === '' || !filter_var($apiUrl, FILTER_VALIDATE_URL)) {
+            return ['success' => false, 'message' => 'API URL WA tidak valid.'];
+        }
+        if (trim($data['api_key'] ?? '') === '') {
+            return ['success' => false, 'message' => 'API Key WA wajib diisi.'];
+        }
+
+        $payload = [
+            'provider' => $provider,
+            'api_url' => $apiUrl,
+            'api_key' => trim($data['api_key']),
+            'api_secret' => trim($data['api_secret'] ?? ''),
+            'sender_number' => trim($data['sender_number'] ?? ''),
+            'is_active' => isset($data['is_active']) ? 1 : 0,
+            'notify_on_payment' => isset($data['notify_on_payment']) ? 1 : 0,
+            'notify_on_withdrawal' => isset($data['notify_on_withdrawal']) ? 1 : 0,
+            'notify_on_expiry' => isset($data['notify_on_expiry']) ? 1 : 0,
+            'notify_admin_number' => trim($data['notify_admin_number'] ?? ''),
+            'message_template_payment' => trim($data['message_template_payment'] ?? ''),
+            'message_template_withdrawal' => trim($data['message_template_withdrawal'] ?? ''),
+        ];
+
+        $this->waConfigRepo->upsert($merchantId, $payload);
+
+        $this->auditService->log(
+            Auth::id(), Auth::role(), $merchantId,
+            'wa_config_updated', "Konfigurasi WhatsApp ({$provider}) diperbarui", ['provider' => $provider]
+        );
+
+        return ['success' => true, 'message' => 'Konfigurasi WhatsApp berhasil disimpan.'];
+    }
+
+    /**
+     * Send a test WA message for the active project.
+     */
+    public function testWa(string $testPhone): array
+    {
+        $merchantId = Auth::merchantId();
+        if (!$merchantId || !$this->projectService->userOwns(Auth::id(), $merchantId)) {
+            return ['success' => false, 'message' => 'Proyek aktif tidak valid.'];
+        }
+        if (trim($testPhone) === '') {
+            return ['success' => false, 'message' => 'Nomor tujuan test wajib diisi.'];
+        }
+
+        $result = $this->waService->testConnection($merchantId, $testPhone);
+        if ($result['success'] ?? false) {
+            return ['success' => true, 'message' => 'Test WA berhasil dikirim!'];
+        }
+        return ['success' => false, 'message' => 'Gagal kirim WA: ' . ($result['error'] ?? 'Unknown error')];
     }
 
     /**

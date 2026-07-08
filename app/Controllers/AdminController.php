@@ -79,7 +79,14 @@ class AdminController
             return ['success' => false, 'message' => 'Status tidak valid.'];
         }
 
-        $this->merchantRepo->update($merchantId, ['status' => $status, 'updated_at' => now()]);
+        $updates = ['status' => $status, 'updated_at' => now()];
+        // Record verification metadata when activating
+        if ($status === 'active' && $merchant['status'] !== 'active') {
+            $updates['verified_at'] = now();
+            $updates['verified_by'] = Auth::id();
+        }
+
+        $this->merchantRepo->update($merchantId, $updates);
 
         $this->auditService->log(
             Auth::id(), Auth::role(), $merchantId,
@@ -88,7 +95,109 @@ class AdminController
             ['old_status' => $merchant['status'], 'new_status' => $status]
         );
 
+        // Notify project owner of the status change
+        $this->notifyOwnerStatusChange($merchant, $status);
+
         return ['success' => true, 'message' => 'Status merchant berhasil diperbarui.'];
+    }
+
+    /**
+     * Verify (approve) a pending project/merchant.
+     */
+    public function approveMerchant(string $merchantId): array
+    {
+        $merchant = $this->merchantRepo->find($merchantId);
+        if (!$merchant) {
+            return ['success' => false, 'message' => 'Proyek tidak ditemukan.'];
+        }
+        if ($merchant['status'] === 'active') {
+            return ['success' => false, 'message' => 'Proyek sudah aktif.'];
+        }
+
+        $this->merchantRepo->update($merchantId, [
+            'status' => 'active',
+            'rejection_reason' => null,
+            'verified_at' => now(),
+            'verified_by' => Auth::id(),
+            'updated_at' => now(),
+        ]);
+
+        $this->auditService->log(
+            Auth::id(), Auth::role(), $merchantId,
+            'merchant_verified',
+            "Proyek {$merchant['business_name']} diverifikasi & diaktifkan",
+            ['old_status' => $merchant['status']]
+        );
+
+        $this->notifyOwnerStatusChange($merchant, 'active');
+
+        return ['success' => true, 'message' => "Proyek '{$merchant['business_name']}' berhasil diverifikasi & diaktifkan."];
+    }
+
+    /**
+     * Reject a pending project/merchant with a reason.
+     */
+    public function rejectMerchant(string $merchantId, string $reason = ''): array
+    {
+        $merchant = $this->merchantRepo->find($merchantId);
+        if (!$merchant) {
+            return ['success' => false, 'message' => 'Proyek tidak ditemukan.'];
+        }
+
+        $this->merchantRepo->update($merchantId, [
+            'status' => 'rejected',
+            'rejection_reason' => trim($reason) ?: 'Tidak memenuhi persyaratan.',
+            'updated_at' => now(),
+        ]);
+
+        $this->auditService->log(
+            Auth::id(), Auth::role(), $merchantId,
+            'merchant_rejected',
+            "Proyek {$merchant['business_name']} ditolak",
+            ['reason' => $reason]
+        );
+
+        $this->notifyOwnerStatusChange($merchant, 'rejected', $reason);
+
+        return ['success' => true, 'message' => "Proyek '{$merchant['business_name']}' ditolak."];
+    }
+
+    /**
+     * Get projects pending verification.
+     */
+    public function pendingMerchants(): array
+    {
+        return $this->merchantRepo->findAll(['status' => 'pending']);
+    }
+
+    /**
+     * Notify a project owner about a status change (in-app + optional WA).
+     */
+    private function notifyOwnerStatusChange(array $merchant, string $status, string $reason = ''): void
+    {
+        try {
+            require_once base_path('app/Services/NotificationService.php');
+            $notif = new NotificationService();
+
+            $ownerId = $merchant['owner_id'] ?? null;
+            $name = $merchant['business_name'] ?? 'Proyek';
+
+            $message = match ($status) {
+                'active' => "Proyek '{$name}' Anda telah diverifikasi dan aktif. Anda sekarang bisa menerima pembayaran.",
+                'rejected' => "Proyek '{$name}' Anda ditolak." . ($reason ? " Alasan: {$reason}" : ''),
+                'suspended' => "Proyek '{$name}' Anda ditangguhkan. Hubungi admin untuk info lebih lanjut.",
+                default => "Status proyek '{$name}' Anda berubah menjadi {$status}.",
+            };
+
+            if ($ownerId) {
+                $notif->notifyMerchant($ownerId, 'project_status', $message, [
+                    'merchant_id' => $merchant['id'],
+                    'status' => $status,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            app_log("Failed to notify owner of status change: " . $e->getMessage(), 'ERROR');
+        }
     }
 
     /**

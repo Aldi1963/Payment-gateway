@@ -92,6 +92,9 @@ class Auth
         $_SESSION['logged_in_at'] = time();
         $_SESSION['_fingerprint'] = self::generateFingerprint();
         $_SESSION['_login_ip'] = self::getTrustedClientIp();
+
+        // Multi-project: set active project (default/first) for merchant users
+        self::initActiveProject($user);
         
         // Update last login
         $userRepo->update($user['id'], ['last_login_at' => now()]);
@@ -116,6 +119,42 @@ class Auth
         $_SESSION['logged_in_at'] = time();
         $_SESSION['_fingerprint'] = self::generateFingerprint();
         $_SESSION['_login_ip'] = self::getTrustedClientIp();
+
+        // Multi-project: set active project (default/first) for merchant users
+        self::initActiveProject($user);
+    }
+
+    /**
+     * Initialize the active project (merchant) for a merchant user on login.
+     * Loads the user's default project from user_merchants and sets it in session.
+     * Falls back to the legacy users.merchant_id column.
+     */
+    private static function initActiveProject(array $user): void
+    {
+        $role = $user['role'] ?? 'merchant';
+        if (!in_array($role, ['merchant', 'staff_merchant'])) {
+            return; // only merchant users have projects
+        }
+
+        try {
+            require_once base_path('app/Repositories/UserMerchantRepository.php');
+            $userMerchantRepo = new UserMerchantRepository();
+            $defaultId = $userMerchantRepo->getDefaultMerchantId($user['id']);
+
+            if ($defaultId) {
+                $_SESSION['active_merchant_id'] = $defaultId;
+                $_SESSION['merchant_id'] = $defaultId;
+            } elseif (!empty($user['merchant_id'])) {
+                // Legacy fallback
+                $_SESSION['active_merchant_id'] = $user['merchant_id'];
+                $_SESSION['merchant_id'] = $user['merchant_id'];
+            }
+        } catch (\Throwable $e) {
+            // If the pivot table doesn't exist yet (pre-migration), keep legacy value
+            if (!empty($user['merchant_id'])) {
+                $_SESSION['active_merchant_id'] = $user['merchant_id'];
+            }
+        }
     }
 
     /**
@@ -136,15 +175,26 @@ class Auth
             return ['success' => false, 'message' => 'Email sudah terdaftar.'];
         }
         
-        // Create merchant
+        // Generate a unique slug from the business name
+        $slugBase = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['business_name'] ?: 'proyek'));
+        $slugBase = substr($slugBase ?: 'proyek', 0, 90);
+        $slug = $slugBase . '-' . substr(generate_random(6), 0, 6);
+
+        // Create user first (so we have owner_id for the merchant)
+        $userId = generate_uuid();
+
+        // Create merchant (first project)
         $merchantId = generate_uuid();
         $merchant = [
             'id' => $merchantId,
             'business_name' => $data['business_name'],
+            'slug' => $slug,
+            'owner_id' => $userId,
             'owner_name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? '',
             'status' => 'pending',
+            'mode' => 'sandbox',
             'api_key' => generate_api_key(),
             'webhook_url' => '',
             'redirect_url' => '',
@@ -157,7 +207,6 @@ class Auth
         $merchantRepo->create($merchant);
         
         // Create user
-        $userId = generate_uuid();
         $user = [
             'id' => $userId,
             'merchant_id' => $merchantId,
@@ -170,6 +219,11 @@ class Auth
             'updated_at' => now(),
         ];
         $userRepo->create($user);
+
+        // Link user to merchant via pivot (first project = default)
+        require_once base_path('app/Repositories/UserMerchantRepository.php');
+        $userMerchantRepo = new UserMerchantRepository();
+        $userMerchantRepo->link($userId, $merchantId, 'owner', true);
         
         // Create wallet
         $wallet = [
@@ -230,11 +284,21 @@ class Auth
     }
 
     /**
-     * Get current merchant ID
+     * Get current merchant ID (active project).
+     * Prefers the active project selected via the project switcher,
+     * falling back to the legacy single-merchant pointer.
      */
     public static function merchantId(): ?string
     {
-        return $_SESSION['merchant_id'] ?? null;
+        return $_SESSION['active_merchant_id'] ?? $_SESSION['merchant_id'] ?? null;
+    }
+
+    /**
+     * Get the raw active project id (alias for clarity).
+     */
+    public static function activeProjectId(): ?string
+    {
+        return self::merchantId();
     }
 
     /**
