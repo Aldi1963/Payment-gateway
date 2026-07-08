@@ -129,7 +129,7 @@ require_once __DIR__ . '/../includes/admin_layout.php';
 </a>
 
 <!-- Summary Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 p-4">
         <p class="text-xs text-slate-500">Status</p>
         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium mt-1 <?= status_badge_class($merchant['status']) ?>"><?= ucfirst($merchant['status']) ?></span>

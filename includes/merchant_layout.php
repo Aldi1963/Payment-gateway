@@ -86,7 +86,7 @@ if ($userRole === 'staff_merchant') {
     </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         <!-- Topbar -->
         <header class="bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center justify-between">
             <div class="flex items-center gap-4">

@@ -8,6 +8,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/style.css">
+    <style>
+        @media (max-width: 640px) {
+            table th, table td { padding: 8px 10px !important; font-size: 12px; }
+            .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+        }
+        html { overflow-x: hidden; max-width: 100vw; }
+    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -18,4 +25,4 @@
         }
     </script>
 </head>
-<body class="h-full font-sans bg-slate-50 text-slate-900 antialiased">
+<body class="h-full font-sans bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
