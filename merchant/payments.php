@@ -90,6 +90,59 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                 <input type="text" name="link_name" value="<?= e($_POST['link_name'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Pembayaran Pesanan #123">
             </div>
 
+            <!-- Payment Channel Selection -->
+            <div class="border-t border-slate-200 pt-4">
+                <p class="text-sm font-medium text-slate-700 mb-3">Metode Pembayaran</p>
+                <?php
+                $channelManager = PaymentChannelManager::getInstance();
+                $availableChannels = $channelManager->getEnabledChannels();
+                ?>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <?php if (isset($availableChannels['qris'])): ?>
+                    <label class="relative flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 transition-all">
+                        <input type="radio" name="payment_channel" value="qris" <?= ($_POST['payment_channel'] ?? 'qris') === 'qris' ? 'checked' : '' ?> class="w-4 h-4 text-blue-600">
+                        <div>
+                            <p class="text-sm font-medium text-slate-800">QRIS</p>
+                            <p class="text-xs text-slate-500">Semua e-wallet & mobile banking</p>
+                        </div>
+                    </label>
+                    <?php endif; ?>
+                    <?php if (isset($availableChannels['midtrans'])): ?>
+                    <label class="relative flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 transition-all">
+                        <input type="radio" name="payment_channel" value="midtrans" <?= ($_POST['payment_channel'] ?? '') === 'midtrans' ? 'checked' : '' ?> class="w-4 h-4 text-indigo-600">
+                        <div>
+                            <p class="text-sm font-medium text-slate-800">Midtrans</p>
+                            <p class="text-xs text-slate-500">VA, CC, GoPay, ShopeePay, dll</p>
+                        </div>
+                    </label>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Midtrans Payment Method (shown when midtrans selected) -->
+                <div id="midtransMethodSection" class="mt-3 hidden">
+                    <label class="block text-xs text-slate-500 mb-1">Pilih Metode (opsional, kosong = tampilkan semua)</label>
+                    <select name="payment_method" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
+                        <option value="">Semua metode (Snap)</option>
+                        <?php if (isset($availableChannels['midtrans'])):
+                            $methods = $availableChannels['midtrans']->getSupportedMethods();
+                            foreach ($methods as $m): ?>
+                        <option value="<?= e($m['code']) ?>" <?= ($_POST['payment_method'] ?? '') === $m['code'] ? 'selected' : '' ?>><?= e($m['name']) ?></option>
+                        <?php endforeach; endif; ?>
+                    </select>
+                </div>
+                <script>
+                document.querySelectorAll('input[name="payment_channel"]').forEach(r => {
+                    r.addEventListener('change', () => {
+                        document.getElementById('midtransMethodSection').classList.toggle('hidden', r.value !== 'midtrans' || !r.checked);
+                    });
+                });
+                // Init state
+                if (document.querySelector('input[name="payment_channel"][value="midtrans"]:checked')) {
+                    document.getElementById('midtransMethodSection').classList.remove('hidden');
+                }
+                </script>
+            </div>
+
             <div class="border-t border-slate-200 pt-4">
                 <p class="text-sm font-medium text-slate-700 mb-3">Informasi Customer</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

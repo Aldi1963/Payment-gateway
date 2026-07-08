@@ -80,6 +80,16 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+    <?php
+    // Load Midtrans Snap.js if this is a Midtrans transaction
+    $isMidtrans = ($transaction['payment_channel'] ?? '') === 'midtrans' && !empty($transaction['snap_token']);
+    if ($isMidtrans):
+        $midtransClientKey = setting('midtrans_client_key', '');
+        $isProduction = setting('midtrans_is_production', '0') === '1';
+        $snapJsUrl = $isProduction ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js';
+    ?>
+    <script src="<?= e($snapJsUrl) ?>" data-client-key="<?= e($midtransClientKey) ?>"></script>
+    <?php endif; ?>
 </head>
 <body class="min-h-screen font-sans bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center p-4">
 
@@ -138,11 +148,15 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
 
 <?php else: ?>
 <!-- PENDING - MAIN CHECKOUT -->
+<?php
+$isMidtrans = ($transaction['payment_channel'] ?? '') === 'midtrans' && !empty($transaction['snap_token']);
+$isQris = !$isMidtrans;
+?>
 <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
     <!-- Header with merchant branding -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 text-white text-center">
+    <div class="bg-gradient-to-r <?= $isMidtrans ? 'from-indigo-600 to-purple-700' : 'from-blue-600 to-blue-700' ?> px-6 py-5 text-white text-center">
         <h1 class="text-lg font-bold"><?= e($merchantName) ?></h1>
-        <p class="text-blue-200 text-sm mt-0.5"><?= e($transaction['link_name'] ?? 'Pembayaran') ?></p>
+        <p class="<?= $isMidtrans ? 'text-indigo-200' : 'text-blue-200' ?> text-sm mt-0.5"><?= e($transaction['link_name'] ?? 'Pembayaran') ?></p>
     </div>
 
     <div class="p-6">
@@ -153,16 +167,37 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
             <p class="text-xs text-slate-400 mt-1 font-mono"><?= e($transaction['order_id']) ?></p>
         </div>
 
-        <!-- QR Code -->
+<?php if ($isMidtrans): ?>
+        <!-- ========== MIDTRANS SNAP CHECKOUT ========== -->
+        <div id="midtrans-checkout" class="mb-5">
+            <button id="pay-button" onclick="payWithSnap()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 text-lg">
+                Bayar Sekarang
+            </button>
+            <p class="text-center text-xs text-slate-400 mt-3">Pilih metode pembayaran: VA, Kartu Kredit, GoPay, ShopeePay, dll</p>
+        </div>
+
+        <!-- Midtrans payment info -->
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+            <p class="text-sm font-medium text-indigo-800 mb-2">Metode Pembayaran Tersedia:</p>
+            <div class="flex flex-wrap gap-2">
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">VA Bank</span>
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">Kartu Kredit</span>
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">GoPay</span>
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">ShopeePay</span>
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">QRIS</span>
+                <span class="text-xs bg-white border border-indigo-100 rounded-lg px-2 py-1 text-indigo-700">Alfamart</span>
+            </div>
+        </div>
+
+<?php else: ?>
+        <!-- ========== QRIS CHECKOUT ========== -->
         <?php if (!empty($transaction['qr_url'])): ?>
         <div class="flex justify-center mb-5">
             <div class="p-3 bg-white border-2 border-slate-200 rounded-xl shadow-sm">
                 <?php
-                // Check if qr_url is a raw QRIS string (starts with "000201") or a URL
                 $qrData = $transaction['qr_url'];
                 $isRawQris = !str_starts_with($qrData, 'http');
                 if ($isRawQris):
-                    // Use QR code generator API to render the raw QRIS string as an image
                     $qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($qrData);
                 ?>
                 <img src="<?= e($qrImageUrl) ?>" alt="QRIS" class="w-48 h-48 object-contain" id="qrImage">
@@ -179,7 +214,6 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
         </div>
         <?php endif; ?>
 
-
         <!-- Payment instructions -->
         <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
             <p class="text-sm font-medium text-blue-800 mb-2">Cara Pembayaran:</p>
@@ -190,6 +224,7 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
                 <li>Konfirmasi pembayaran sebesar <strong><?= format_currency($transaction['amount']) ?></strong></li>
             </ol>
         </div>
+<?php endif; ?>
 
         <!-- Countdown Timer -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center mb-4">
@@ -223,7 +258,7 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
     </div>
 </div>
 
-<!-- Auto-check Script -->
+<!-- Auto-check & Payment Scripts -->
 <script>
 (function() {
     let remaining = <?= $remainingSeconds ?>;
@@ -270,7 +305,6 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
                     statusText.textContent = '✓ Pembayaran berhasil!';
                     statusText.className = 'text-sm font-bold text-emerald-700';
                     clearInterval(checkInterval);
-                    // Redirect after 2 seconds
                     setTimeout(() => {
                         const redirect = data.redirect_url || location.href;
                         location.href = redirect;
@@ -279,12 +313,50 @@ $thankYouMsg = $merchant['thank_you_message'] ?? 'Terima kasih atas pembayaran A
                     location.reload();
                 }
             })
-            .catch(() => {}); // silently ignore network errors
+            .catch(() => {});
     }
     checkInterval = setInterval(checkStatus, 5000);
-    // Also check immediately
     setTimeout(checkStatus, 2000);
 })();
+
+<?php if ($isMidtrans): ?>
+// Midtrans Snap.js integration
+function payWithSnap() {
+    const btn = document.getElementById('pay-button');
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+    
+    window.snap.pay('<?= e($transaction['snap_token']) ?>', {
+        onSuccess: function(result) {
+            document.getElementById('statusBox').className = 'bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center';
+            document.getElementById('statusText').textContent = '✓ Pembayaran berhasil!';
+            document.getElementById('statusText').className = 'text-sm font-bold text-emerald-700';
+            setTimeout(() => location.reload(), 1500);
+        },
+        onPending: function(result) {
+            btn.disabled = false;
+            btn.textContent = 'Bayar Sekarang';
+            document.getElementById('statusText').textContent = 'Menunggu pembayaran...';
+        },
+        onError: function(result) {
+            btn.disabled = false;
+            btn.textContent = 'Coba Lagi';
+            document.getElementById('statusBox').className = 'bg-red-50 border border-red-200 rounded-xl p-3 text-center';
+            document.getElementById('statusText').textContent = 'Pembayaran gagal. Silakan coba lagi.';
+            document.getElementById('statusText').className = 'text-sm font-medium text-red-700';
+        },
+        onClose: function() {
+            btn.disabled = false;
+            btn.textContent = 'Bayar Sekarang';
+        }
+    });
+}
+
+// Auto-open Snap on page load
+window.addEventListener('load', function() {
+    setTimeout(payWithSnap, 500);
+});
+<?php endif; ?>
 </script>
 <?php endif; ?>
 

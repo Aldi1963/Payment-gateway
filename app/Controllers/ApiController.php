@@ -125,20 +125,24 @@ class ApiController
 
         if ($result['success']) {
             $tx = $result['transaction'];
-            json_response([
-                'success' => true,
-                'data' => [
-                    'id' => $tx['id'],
-                    'order_id' => $tx['order_id'],
-                    'amount' => $tx['amount'],
-                    'fee' => $tx['fee'],
-                    'net_amount' => $tx['net_amount'],
-                    'status' => $tx['status'],
-                    'payment_url' => $tx['payment_url'],
-                    'qr_url' => $tx['qr_url'],
-                    'created_at' => $tx['created_at'],
-                ],
-            ], 201);
+            $responseData = [
+                'id' => $tx['id'],
+                'order_id' => $tx['order_id'],
+                'amount' => $tx['amount'],
+                'fee' => $tx['fee'],
+                'net_amount' => $tx['net_amount'],
+                'status' => $tx['status'],
+                'payment_channel' => $tx['payment_channel'] ?? 'qris',
+                'payment_method' => $tx['payment_method'] ?? null,
+                'payment_url' => $tx['payment_url'],
+                'qr_url' => $tx['qr_url'],
+                'created_at' => $tx['created_at'],
+            ];
+            // Include snap_token for Midtrans (frontend Snap.js integration)
+            if (!empty($tx['snap_token'])) {
+                $responseData['snap_token'] = $tx['snap_token'];
+            }
+            json_response(['success' => true, 'data' => $responseData], 201);
         } else {
             json_response(['success' => false, 'error' => $result['message']], 400);
         }

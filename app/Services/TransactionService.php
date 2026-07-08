@@ -2,10 +2,12 @@
 /**
  * Transaction Service
  * Business logic for payment transactions
+ * Supports multiple payment channels via PaymentChannelManager
  */
 
 require_once base_path('app/Repositories/TransactionRepository.php');
 require_once base_path('app/Repositories/MerchantRepository.php');
+require_once base_path('app/Services/PaymentChannelManager.php');
 require_once base_path('app/Services/AldiQrisService.php');
 require_once base_path('app/Services/FeeService.php');
 require_once base_path('app/Services/WalletService.php');
@@ -15,7 +17,6 @@ class TransactionService
 {
     private TransactionRepository $transactionRepo;
     private MerchantRepository $merchantRepo;
-    private AldiQrisService $aldiQris;
     private FeeService $feeService;
     private WalletService $walletService;
     private AuditLogService $auditService;
@@ -24,7 +25,6 @@ class TransactionService
     {
         $this->transactionRepo = new TransactionRepository();
         $this->merchantRepo = new MerchantRepository();
-        $this->aldiQris = new AldiQrisService();
         $this->feeService = new FeeService();
         $this->walletService = new WalletService();
         $this->auditService = new AuditLogService();
@@ -32,6 +32,10 @@ class TransactionService
 
     /**
      * Create a new payment transaction
+     * 
+     * @param array $data Transaction data including optional 'payment_channel' and 'payment_method'
+     * @param string $merchantId Merchant ID
+     * @return array Result with success status and transaction data
      */
     public function create(array $data, string $merchantId): array
     {
@@ -43,10 +47,32 @@ class TransactionService
         if ($merchant['status'] !== 'active') {
             return ['success' => false, 'message' => 'Merchant tidak aktif.'];
         }
-        // Validate provider API key (AldiQRIS)
-        $providerApiKey = setting('aldiqris_api_key', config('gateway.aldiqris.api_key', ''));
-        if (empty($providerApiKey)) {
-            return ['success' => false, 'message' => 'API key AldiQRIS belum dikonfigurasi.'];
+
+        // Determine payment channel (default: qris/aldiqris)
+        $channelCode = $data['payment_channel'] ?? 'qris';
+        $paymentMethod = $data['payment_method'] ?? null;
+
+        // Validate channel is available
+        $channelManager = PaymentChannelManager::getInstance();
+        $channel = $channelManager->getChannel($channelCode);
+        if (!$channel) {
+            return ['success' => false, 'message' => "Channel '{$channelCode}' tidak tersedia."];
+        }
+        if (!$channel->isEnabled()) {
+            return ['success' => false, 'message' => "Channel '{$channelCode}' tidak aktif. Hubungi admin."];
+        }
+
+        // Validate provider credentials based on channel
+        if ($channelCode === 'qris') {
+            $providerApiKey = setting('aldiqris_api_key', config('gateway.aldiqris.api_key', ''));
+            if (empty($providerApiKey)) {
+                return ['success' => false, 'message' => 'API key AldiQRIS belum dikonfigurasi.'];
+            }
+        } elseif ($channelCode === 'midtrans') {
+            $midtransKey = setting('midtrans_server_key', '');
+            if (empty($midtransKey)) {
+                return ['success' => false, 'message' => 'Midtrans Server Key belum dikonfigurasi.'];
+            }
         }
 
         // Validate amount
@@ -86,7 +112,7 @@ class TransactionService
         // Build redirect URL
         $redirectUrl = $data['redirect_url'] ?? $merchant['redirect_url'] ?? '';
         if (empty($redirectUrl)) {
-            $redirectUrl = app_url('success.php') . '?order_id=' . urlencode($orderId);
+            $redirectUrl = app_url('pay.php') . '?order_id=' . urlencode($orderId) . '&status=success';
         }
 
         // Prepare transaction record
@@ -102,6 +128,9 @@ class TransactionService
             'fee_snapshot' => $feeResult['snapshot'],
             'net_amount' => $netAmount,
             'status' => 'PENDING',
+            'payment_channel' => $channelCode,
+            'payment_method' => $paymentMethod,
+            'snap_token' => null,
             'link_name' => $data['link_name'] ?? "Tagihan {$orderId}",
             'customer_name' => $data['customer_name'] ?? '',
             'customer_wa' => $data['customer_wa'] ?? '',
@@ -119,43 +148,57 @@ class TransactionService
             'updated_at' => now(),
         ];
 
-        // Build API payload
-        $apiPayload = [
+        // Build channel-specific payload
+        $channelPayload = [
             'order_id' => $orderId,
             'amount' => $amount,
             'link_name' => $transaction['link_name'],
             'webhook_url' => $webhookUrl,
             'redirect_url' => $redirectUrl,
+            'merchant_id' => $merchantId,
+            'customer_name' => $data['customer_name'] ?? '',
+            'customer_wa' => $data['customer_wa'] ?? '',
+            'customer_email' => $data['customer_email'] ?? '',
+            'payment_method' => $paymentMethod,
         ];
 
-        // Add customer info if available
-        if (!empty($data['customer_name']) || !empty($data['customer_wa']) || !empty($data['customer_email'])) {
-            $apiPayload['customer'] = array_filter([
-                'name' => $data['customer_name'] ?? '',
-                'wa' => $data['customer_wa'] ?? '',
-                'email' => $data['customer_email'] ?? '',
-            ]);
+        // For AldiQRIS, add the API key
+        if ($channelCode === 'qris') {
+            $channelPayload['api_key'] = $providerApiKey ?? '';
         }
 
-        $transaction['api_request'] = json_encode($apiPayload);
+        $transaction['api_request'] = json_encode($channelPayload);
 
-        // Call AldiQRIS API using provider API key
-        $apiResult = $this->aldiQris->createTransaction($apiPayload, $providerApiKey);
+        // Call the payment channel
+        $apiResult = $channel->createPayment($channelPayload);
         $transaction['api_response'] = $apiResult['raw_response'] ?? json_encode($apiResult);
 
         if ($apiResult['success']) {
-            // Store QR data from AldiQRIS for display on our own page
-            $transaction['qr_url'] = $apiResult['qr_url'];
-            
-            // Store AldiQRIS payment link in note for admin reference
-            $providerPaymentUrl = $apiResult['payment_url'];
-            if ($providerPaymentUrl) {
-                $transaction['note'] = ($transaction['note'] ? $transaction['note'] . ' | ' : '') .
-                                       'provider_url:' . $providerPaymentUrl;
+            if ($channelCode === 'qris') {
+                // AldiQRIS: store QR, point payment_url to our page
+                $transaction['qr_url'] = $apiResult['qr_url'];
+                $providerPaymentUrl = $apiResult['payment_url'];
+                if ($providerPaymentUrl) {
+                    $transaction['note'] = ($transaction['note'] ? $transaction['note'] . ' | ' : '') .
+                                           'provider_url:' . $providerPaymentUrl;
+                }
+                $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
+
+            } elseif ($channelCode === 'midtrans') {
+                // Midtrans: store snap_token, point payment_url to our page (which loads Snap)
+                $transaction['snap_token'] = $apiResult['snap_token'] ?? null;
+                $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
+                // Store Midtrans redirect URL as fallback
+                if (!empty($apiResult['payment_url'])) {
+                    $transaction['note'] = ($transaction['note'] ? $transaction['note'] . ' | ' : '') .
+                                           'midtrans_redirect:' . $apiResult['payment_url'];
+                }
+
+            } else {
+                // Other channels: use whatever URL they return
+                $transaction['payment_url'] = $apiResult['payment_url'] ?? app_url('pay.php?order_id=' . urlencode($orderId));
+                $transaction['qr_url'] = $apiResult['qr_url'] ?? null;
             }
-            
-            // payment_url points to OUR branded checkout page, not AldiQRIS
-            $transaction['payment_url'] = app_url('pay.php?order_id=' . urlencode($orderId));
         } else {
             // Still save the transaction even if API fails
             $transaction['status'] = 'FAILED';
@@ -172,8 +215,8 @@ class TransactionService
             Auth::role(),
             $merchantId,
             'create_transaction',
-            "Created transaction {$orderId} amount " . format_currency($amount),
-            ['transaction_id' => $transactionId, 'order_id' => $orderId, 'amount' => $amount]
+            "Created {$channelCode} transaction {$orderId} amount " . format_currency($amount),
+            ['transaction_id' => $transactionId, 'order_id' => $orderId, 'amount' => $amount, 'channel' => $channelCode, 'method' => $paymentMethod]
         );
 
         return [
