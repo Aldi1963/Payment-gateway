@@ -23,9 +23,16 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         .sidebar-link.active { background: rgba(59,130,246,0.1); color: #2563eb; border-left: 3px solid #2563eb; }
         pre code { white-space: pre-wrap; word-break: break-all; }
         .copy-btn:active { transform: scale(0.95); }
+        html, body { overflow-x: hidden; max-width: 100vw; }
+        table { table-layout: auto; }
+        @media (max-width: 640px) {
+            pre { font-size: 11px; padding: 12px !important; }
+            table th, table td { padding: 8px 10px !important; font-size: 12px; }
+            .grid-cols-1.lg\:grid-cols-2 { grid-template-columns: 1fr !important; }
+        }
     </style>
 </head>
-<body class="font-sans bg-white text-slate-900">
+<body class="font-sans bg-white text-slate-900 overflow-x-hidden">
 
 
 <!-- Top Navigation -->
@@ -49,7 +56,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 </header>
 
 
-<div class="flex pt-16">
+<div class="flex pt-16 overflow-hidden">
 <!-- Sidebar -->
 <aside class="hidden lg:block w-64 fixed top-16 left-0 bottom-0 overflow-y-auto border-r border-slate-200 bg-slate-50/50 p-6">
     <nav class="space-y-1">
@@ -74,7 +81,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 
 
 <!-- Main Content -->
-<main class="flex-1 lg:ml-64 max-w-4xl mx-auto px-4 sm:px-8 py-12">
+<main class="flex-1 lg:ml-64 max-w-4xl mx-auto px-4 sm:px-8 py-12 w-full min-w-0 overflow-hidden">
 
 <!-- Introduction -->
 <section id="introduction" class="mb-16">
@@ -193,8 +200,8 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
             <tbody class="divide-y divide-slate-100">
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">amount</td><td class="px-4 py-3 text-slate-500">integer</td><td class="px-4 py-3"><span class="text-red-500 font-bold text-xs">Yes</span></td><td class="px-4 py-3 text-slate-600">Jumlah pembayaran (Rupiah)</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">order_id</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Order ID unik (auto-generate jika kosong)</td></tr>
-                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">payment_channel</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Channel: <code>qris</code> (default) atau <code>midtrans</code></td></tr>
-                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">payment_method</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Metode: <code>midtrans_bca_va</code>, <code>midtrans_bni_va</code>, <code>midtrans_qris</code>, <code>midtrans_gopay</code>, dll</td></tr>
+                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs break-all">payment_channel</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Channel: <code>qris</code> (default) atau <code>midtrans</code></td></tr>
+                <tr class="bg-indigo-50/50"><td class="px-4 py-3 font-mono text-indigo-600 text-xs break-all">payment_method</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Metode: <code>BCAVA</code>, <code>BNIVA</code>, <code>GOPAY</code>, dll</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">link_name</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Nama/deskripsi pembayaran</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">customer_name</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Nama customer</td></tr>
                 <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">customer_email</td><td class="px-4 py-3 text-slate-500">string</td><td class="px-4 py-3"><span class="text-slate-400 text-xs">No</span></td><td class="px-4 py-3 text-slate-600">Email customer</td></tr>
@@ -249,7 +256,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div>
+        <div class="min-w-0">
             <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Request Example</h4>
             <div class="bg-slate-900 rounded-xl overflow-hidden">
                 <div class="flex items-center justify-between px-4 py-2 bg-slate-800">
@@ -268,7 +275,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
   }'</code></pre>
             </div>
         </div>
-        <div>
+        <div class="min-w-0">
             <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Response (201)</h4>
             <div class="bg-slate-900 rounded-xl overflow-hidden">
                 <div class="px-4 py-2 bg-slate-800"><span class="text-xs text-slate-400 font-mono">JSON</span></div>
