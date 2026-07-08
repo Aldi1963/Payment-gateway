@@ -76,6 +76,55 @@ class EWalletChannel implements PaymentChannelInterface
 
     public function checkStatus(string $referenceId): array
     {
+        // Determine which wallet provider based on reference pattern or settings
+        $wallets = ['dana', 'ovo', 'gopay', 'shopeepay', 'linkaja'];
+        
+        foreach ($wallets as $wallet) {
+            $apiUrl = setting("ewallet_{$wallet}_api_url", '');
+            $apiKey = setting("ewallet_{$wallet}_api_key", '');
+            
+            if (empty($apiUrl) || empty($apiKey)) {
+                continue;
+            }
+
+            // Build status check URL
+            $statusUrl = rtrim($apiUrl, '/') . '/status/' . urlencode($referenceId);
+
+            $ch = curl_init($statusUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $apiKey,
+                    'Content-Type: application/json',
+                ],
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                $data = json_decode($response, true) ?: [];
+                if (!empty($data['status'])) {
+                    $status = strtoupper($data['status']);
+                    $mappedStatus = match($status) {
+                        'SUCCESS', 'COMPLETED', 'SETTLEMENT', 'PAID' => 'PAID',
+                        'PENDING', 'PROCESSING' => 'PENDING',
+                        'FAILED', 'DENIED', 'CANCELLED' => 'FAILED',
+                        'EXPIRED' => 'EXPIRED',
+                        'REFUNDED' => 'REFUNDED',
+                        default => 'PENDING',
+                    };
+                    return [
+                        'status' => $mappedStatus,
+                        'paid_at' => $data['paid_at'] ?? $data['completed_at'] ?? null,
+                        'raw_response' => $response,
+                    ];
+                }
+            }
+        }
+
+        // Fallback: could not determine status
         return ['status' => 'PENDING', 'paid_at' => null];
     }
 

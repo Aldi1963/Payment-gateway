@@ -82,6 +82,56 @@ class VirtualAccountChannel implements PaymentChannelInterface
 
     public function checkStatus(string $referenceId): array
     {
+        // Try each configured bank to check VA payment status
+        $banks = ['bca', 'bni', 'bri', 'mandiri', 'permata'];
+        
+        foreach ($banks as $bank) {
+            $apiUrl = setting("va_{$bank}_api_url", '');
+            $apiKey = setting("va_{$bank}_api_key", '');
+            
+            if (empty($apiUrl) || empty($apiKey)) {
+                continue;
+            }
+
+            // Build status check URL
+            $statusUrl = rtrim($apiUrl, '/') . '/status/' . urlencode($referenceId);
+
+            $ch = curl_init($statusUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $apiKey,
+                    'Content-Type: application/json',
+                ],
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                $data = json_decode($response, true) ?: [];
+                if (!empty($data['status'])) {
+                    $status = strtoupper($data['status']);
+                    $mappedStatus = match($status) {
+                        'SUCCESS', 'COMPLETED', 'SETTLEMENT', 'PAID' => 'PAID',
+                        'PENDING', 'WAITING_PAYMENT' => 'PENDING',
+                        'FAILED', 'DENIED', 'CANCELLED' => 'FAILED',
+                        'EXPIRED' => 'EXPIRED',
+                        'REFUNDED' => 'REFUNDED',
+                        default => 'PENDING',
+                    };
+                    return [
+                        'status' => $mappedStatus,
+                        'paid_at' => $data['paid_at'] ?? $data['payment_time'] ?? null,
+                        'va_number' => $data['va_number'] ?? $data['account_number'] ?? null,
+                        'raw_response' => $response,
+                    ];
+                }
+            }
+        }
+
+        // Fallback: could not determine status from any bank
         return ['status' => 'PENDING', 'paid_at' => null];
     }
 
