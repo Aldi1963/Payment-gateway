@@ -280,11 +280,11 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     API key akun belum tersedia. Pastikan database sudah dimigrasi (<code class="font-mono">php scripts/migrate.php</code>), lalu muat ulang halaman ini.
 </div>
 <?php else: ?>
-<div class="flex items-center gap-2 mb-4">
-    <input type="text" id="apiKeyField" value="<?= e($accountApiKey) ?>" readonly autocomplete="off" class="flex-1 px-4 py-3 bg-slate-900 text-emerald-400 font-mono text-sm rounded-lg border-0">
-    <button type="button" onclick="copyApiKey()" class="px-4 py-3 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">Copy</button>
+<div class="flex items-center gap-2 mb-4 min-w-0">
+    <input type="text" id="apiKeyField" value="<?= e($accountApiKey) ?>" readonly autocomplete="off" class="flex-1 min-w-0 px-4 py-3 bg-slate-900 text-emerald-400 font-mono text-sm rounded-lg border-0">
+    <button type="button" onclick="copyApiKey()" class="flex-shrink-0 px-4 py-3 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">Copy</button>
 </div>
-<p class="text-xs text-slate-400 mb-4">Masked: <?= mask_api_key($accountApiKey) ?></p>
+<p class="text-xs text-slate-400 mb-4 font-mono break-all">Masked: <?= mask_api_key($accountApiKey) ?></p>
 
 <!-- How to target a project -->
 <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6 text-sm">
