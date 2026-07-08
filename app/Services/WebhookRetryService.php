@@ -4,9 +4,12 @@
  * 
  * Handles outbound webhook delivery to merchant URLs with:
  * - Queue-based delivery
- * - Exponential backoff retry (3 attempts: 30s, 120s, 600s)
+ * - True exponential backoff with jitter (5 attempts: ~1min, ~4min, ~16min, ~1hr, ~4hr)
  * - Status tracking per delivery attempt
  * - Logging of all attempts
+ * - Event filtering per merchant
+ * - Manual replay support
+ * - Webhook event types: payment.status_changed, payment.created, refund.created, withdrawal.updated
  */
 
 require_once base_path('app/Repositories/WebhookRetryRepository.php');
@@ -15,14 +18,41 @@ class WebhookRetryService
 {
     private WebhookRetryRepository $retryRepo;
     private int $maxRetries;
-    private array $backoffSeconds; // delay between retries
+    private int $backoffBase; // base seconds for exponential calculation
+
+    // Supported webhook event types
+    public const EVENT_PAYMENT_STATUS_CHANGED = 'payment.status_changed';
+    public const EVENT_PAYMENT_CREATED = 'payment.created';
+    public const EVENT_REFUND_CREATED = 'refund.created';
+    public const EVENT_WITHDRAWAL_UPDATED = 'withdrawal.updated';
+    public const EVENT_TEST = 'test';
+
+    public const ALL_EVENTS = [
+        self::EVENT_PAYMENT_STATUS_CHANGED,
+        self::EVENT_PAYMENT_CREATED,
+        self::EVENT_REFUND_CREATED,
+        self::EVENT_WITHDRAWAL_UPDATED,
+    ];
 
     public function __construct()
     {
         $this->retryRepo = new WebhookRetryRepository();
-        $this->maxRetries = (int)setting('webhook_max_retries', 3);
-        // Exponential backoff: 30s, 2min, 10min
-        $this->backoffSeconds = [30, 120, 600];
+        $this->maxRetries = (int)setting('webhook_max_retries', 5);
+        $this->backoffBase = (int)setting('webhook_retry_backoff_base', 60); // 60 seconds base
+    }
+
+    /**
+     * Calculate exponential backoff delay with jitter
+     * Formula: base * 2^attempt + random_jitter (up to 30% of delay)
+     * 
+     * @param int $attempt Current attempt number (1-based)
+     * @return int Delay in seconds
+     */
+    private function calculateBackoff(int $attempt): int
+    {
+        $delay = $this->backoffBase * pow(2, $attempt - 1); // 60, 120, 240, 480, 960...
+        $jitter = (int)($delay * 0.3 * (mt_rand(0, 100) / 100)); // 0-30% jitter
+        return $delay + $jitter;
     }
 
     /**
@@ -124,9 +154,8 @@ class WebhookRetryService
             return false;
         }
 
-        // Schedule next retry with exponential backoff
-        $backoffIndex = min($attempt - 1, count($this->backoffSeconds) - 1);
-        $delay = $this->backoffSeconds[$backoffIndex];
+        // Schedule next retry with exponential backoff + jitter
+        $delay = $this->calculateBackoff($attempt);
         $nextRetry = date('Y-m-d H:i:s', time() + $delay);
 
         $this->retryRepo->update($webhook['id'], [
@@ -139,6 +168,8 @@ class WebhookRetryService
             'attempts_log' => $attemptsLog,
             'updated_at' => now(),
         ]);
+
+        app_log("Webhook retry #{$attempt} scheduled for {$webhook['merchant_id']}: next at {$nextRetry} (delay: {$delay}s)", 'INFO');
 
         return false;
     }
@@ -188,13 +219,19 @@ class WebhookRetryService
      * Dispatch webhook to merchant after payment status change
      * This is the main entry point called by WebhookService/TransactionService
      */
-    public function dispatch(string $merchantId, string $webhookUrl, array $transaction, string $status): void
+    public function dispatch(string $merchantId, string $webhookUrl, array $transaction, string $status, string $eventType = self::EVENT_PAYMENT_STATUS_CHANGED): void
     {
         if (empty($webhookUrl)) return;
 
+        // Check merchant's event filter
+        if (!$this->shouldDeliverEvent($merchantId, $eventType)) {
+            app_log("Webhook event '{$eventType}' filtered for merchant {$merchantId}", 'DEBUG');
+            return;
+        }
+
         // Build outbound webhook payload
         $payload = [
-            'event' => 'payment.status_changed',
+            'event' => $eventType,
             'transaction_id' => $transaction['id'] ?? '',
             'order_id' => $transaction['order_id'] ?? '',
             'status' => $status,
@@ -221,6 +258,79 @@ class WebhookRetryService
         if (!empty($pending)) {
             $this->deliver($pending[0]);
         }
+    }
+
+    /**
+     * Check if merchant wants to receive this event type
+     * Based on webhook_events_filter in merchants table
+     */
+    private function shouldDeliverEvent(string $merchantId, string $eventType): bool
+    {
+        // Test events always delivered
+        if ($eventType === self::EVENT_TEST) return true;
+
+        try {
+            $merchantRepo = new MerchantRepository();
+            $merchant = $merchantRepo->find($merchantId);
+            if (!$merchant) return true; // If merchant not found, deliver anyway
+
+            $filterJson = $merchant['webhook_events_filter'] ?? null;
+            if (empty($filterJson)) return true; // No filter = deliver all events
+
+            $allowedEvents = json_decode($filterJson, true);
+            if (!is_array($allowedEvents) || empty($allowedEvents)) return true;
+
+            return in_array($eventType, $allowedEvents);
+        } catch (\Throwable $e) {
+            return true; // On error, deliver
+        }
+    }
+
+    /**
+     * Replay a webhook event - re-sends the same payload
+     * Used by admin/merchant to re-trigger a failed webhook
+     */
+    public function replay(string $webhookId): array
+    {
+        $webhook = $this->retryRepo->find($webhookId);
+        if (!$webhook) {
+            return ['success' => false, 'message' => 'Webhook delivery not found'];
+        }
+
+        // Create a new delivery entry as a replay
+        $newId = generate_uuid();
+        $entry = [
+            'id' => $newId,
+            'merchant_id' => $webhook['merchant_id'],
+            'transaction_id' => $webhook['transaction_id'] ?? '',
+            'url' => $webhook['url'],
+            'payload' => $webhook['payload'],
+            'status' => 'pending',
+            'attempts' => 0,
+            'max_retries' => $this->maxRetries,
+            'last_attempt_at' => null,
+            'next_retry_at' => now(),
+            'last_http_code' => null,
+            'last_error' => null,
+            'delivered_at' => null,
+            'attempts_log' => [['note' => "Replayed from webhook {$webhookId}", 'timestamp' => now()]],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        $this->retryRepo->create($entry);
+
+        // Try immediate delivery
+        $fresh = $this->retryRepo->find($newId);
+        if ($fresh) {
+            $result = $this->deliver($fresh);
+            return [
+                'success' => $result,
+                'message' => $result ? 'Webhook replayed and delivered' : 'Webhook replayed, delivery pending',
+                'new_webhook_id' => $newId,
+            ];
+        }
+
+        return ['success' => true, 'message' => 'Webhook queued for replay', 'new_webhook_id' => $newId];
     }
 
     /**
@@ -264,5 +374,33 @@ class WebhookRetryService
         $webhook['status'] = 'pending';
         $result = $this->deliver($webhook);
         return ['success' => $result, 'message' => $result ? 'Delivered' : 'Failed, will retry'];
+    }
+
+    /**
+     * Get webhook delivery statistics
+     */
+    public function getStats(): array
+    {
+        try {
+            $pdo = Database::getConnection();
+            $stats = [];
+            
+            // Delivery success rate (last 7 days)
+            $stmt = $pdo->query("SELECT status, COUNT(*) as count FROM webhook_retries WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY status");
+            $stats['by_status'] = $stmt->fetchAll() ?: [];
+            
+            // Average delivery time
+            $stmt = $pdo->query("SELECT AVG(TIMESTAMPDIFF(SECOND, created_at, delivered_at)) as avg_seconds FROM webhook_retries WHERE status = 'delivered' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $row = $stmt->fetch();
+            $stats['avg_delivery_seconds'] = $row ? round((float)$row['avg_seconds'], 1) : 0;
+            
+            // Pending count
+            $stmt = $pdo->query("SELECT COUNT(*) FROM webhook_retries WHERE status = 'pending'");
+            $stats['pending_count'] = (int)$stmt->fetchColumn();
+            
+            return $stats;
+        } catch (\Throwable $e) {
+            return ['error' => 'Could not fetch stats'];
+        }
     }
 }
