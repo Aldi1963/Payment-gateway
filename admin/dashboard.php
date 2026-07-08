@@ -106,12 +106,16 @@ require_once __DIR__ . '/../includes/admin_layout.php';
     <!-- Revenue Chart (Last 7 days) -->
     <div class="bg-white rounded-xl border border-slate-200 p-5">
         <h3 class="text-sm font-semibold text-slate-800 mb-4">Revenue 7 Hari Terakhir</h3>
-        <canvas id="revenueChart" height="200"></canvas>
+        <div class="relative" style="height: 200px;">
+            <canvas id="revenueChart"></canvas>
+        </div>
     </div>
     <!-- Transaction Status Breakdown -->
     <div class="bg-white rounded-xl border border-slate-200 p-5">
         <h3 class="text-sm font-semibold text-slate-800 mb-4">Status Transaksi</h3>
-        <canvas id="statusChart" height="200"></canvas>
+        <div class="relative" style="height: 200px;">
+            <canvas id="statusChart"></canvas>
+        </div>
     </div>
 </div>
 

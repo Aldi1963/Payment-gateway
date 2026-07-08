@@ -80,11 +80,15 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 p-5">
         <h3 class="text-sm font-semibold text-slate-800 mb-3">Revenue 7 Hari Terakhir</h3>
-        <canvas id="mRevenueChart" height="180"></canvas>
+        <div class="relative" style="height: 180px;">
+            <canvas id="mRevenueChart"></canvas>
+        </div>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5">
         <h3 class="text-sm font-semibold text-slate-800 mb-3">Transaksi Harian</h3>
-        <canvas id="mTxChart" height="180"></canvas>
+        <div class="relative" style="height: 180px;">
+            <canvas id="mTxChart"></canvas>
+        </div>
     </div>
 </div>
 
