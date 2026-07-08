@@ -54,16 +54,23 @@ class WebhookService
             return ['success' => false, 'message' => 'Transaction not found', 'code' => 404];
         }
 
-        // Get merchant to validate signature using their API key
+        // Get merchant for logging and reference
         $merchant = $this->merchantRepo->find($transaction['merchant_id']);
         if (!$merchant) {
             $this->logEvent('invalid', null, $rawPayload, "Merchant not found for transaction");
             return ['success' => false, 'message' => 'Merchant not found', 'code' => 404];
         }
 
-        // Validate signature using merchant API key as secret
+        // Validate signature using AldiQRIS provider API key
+        // AldiQRIS signs webhooks with the same API key used to create transactions
         // SECURITY: Signature is MANDATORY - reject requests without signature
-        $secretKey = $merchant['api_key'];
+        $secretKey = setting('aldiqris_api_key', config('gateway.aldiqris.api_key', ''));
+        if (empty($secretKey)) {
+            // Fallback: if provider key not configured, cannot validate
+            $this->logEvent('invalid', $merchant['id'], $rawPayload, 'AldiQRIS API key not configured for webhook validation');
+            return ['success' => false, 'message' => 'Webhook validation not configured', 'code' => 500];
+        }
+
         if (empty($signature)) {
             $this->logEvent('invalid_signature', $merchant['id'], $rawPayload, 'Missing webhook signature header');
             $this->auditService->log(
