@@ -25,6 +25,8 @@ return [
 
     // Payment URL extraction keys (ordered by priority)
     'payment_url_keys' => [
+        'paylink',
+        'data.paylink',
         'payment_url',
         'checkout_url',
         'payment_link',
@@ -37,6 +39,10 @@ return [
 
     // QR URL extraction keys (ordered by priority)
     'qr_url_keys' => [
+        'raw_qris',
+        'qris',
+        'data.raw_qris',
+        'data.qris',
         'qr_url',
         'qris_url',
         'qr_image',

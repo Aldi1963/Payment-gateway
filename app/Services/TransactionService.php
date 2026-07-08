@@ -43,8 +43,10 @@ class TransactionService
         if ($merchant['status'] !== 'active') {
             return ['success' => false, 'message' => 'Merchant tidak aktif.'];
         }
-        if (empty($merchant['api_key'])) {
-            return ['success' => false, 'message' => 'API key belum dikonfigurasi.'];
+        // Validate provider API key (AldiQRIS)
+        $providerApiKey = setting('aldiqris_api_key', config('gateway.aldiqris.api_key', ''));
+        if (empty($providerApiKey)) {
+            return ['success' => false, 'message' => 'API key AldiQRIS belum dikonfigurasi.'];
         }
 
         // Validate amount
@@ -137,8 +139,8 @@ class TransactionService
 
         $transaction['api_request'] = json_encode($apiPayload);
 
-        // Call AldiQRIS API
-        $apiResult = $this->aldiQris->createTransaction($apiPayload, $merchant['api_key']);
+        // Call AldiQRIS API using provider API key
+        $apiResult = $this->aldiQris->createTransaction($apiPayload, $providerApiKey);
         $transaction['api_response'] = $apiResult['raw_response'] ?? json_encode($apiResult);
 
         if ($apiResult['success']) {
