@@ -56,7 +56,7 @@ if ($transaction) {
 
         // Determine channel from method code
         $upperMethod = strtoupper($selectMethod);
-        if ($upperMethod === 'QRIS') {
+        if ($upperMethod === 'QRIS-A') {
             $channel = 'qris';
             $method = null;
         } else {
@@ -187,7 +187,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         // Add QRIS option
         if (isset($enabledChannels['qris'])) {
             $groups['qris']['methods'][] = [
-                'code' => 'QRIS',
+                'code' => 'QRIS-A',
                 'name' => 'QRIS',
                 'desc' => 'Scan QR dari semua e-wallet & mobile banking',
                 'fee' => 'Fee 0.7%',

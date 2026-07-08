@@ -32,7 +32,7 @@ $appUrl = setting('app_url', app_url(''));
             ['name'=>'amount','type'=>'integer','required'=>true,'desc'=>'Jumlah pembayaran dalam Rupiah'],
             ['name'=>'order_id','type'=>'string','required'=>false,'desc'=>'Order ID unik (auto-generate jika kosong)'],
             ['name'=>'payment_channel','type'=>'string','required'=>false,'desc'=>'Channel: qris (default) atau midtrans'],
-            ['name'=>'payment_method','type'=>'string','required'=>false,'desc'=>'Metode: BCAVA, BNIVA, BRIVA, GOPAY, SHOPEEPAY, MTQRIS, dll'],
+            ['name'=>'payment_method','type'=>'string','required'=>false,'desc'=>'Metode: QRIS-A, BCAVA, BNIVA, BRIVA, GOPAY, SHOPEEPAY, MTQRIS, dll'],
             ['name'=>'link_name','type'=>'string','required'=>false,'desc'=>'Nama/label pembayaran'],
             ['name'=>'webhook_url','type'=>'string','required'=>false,'desc'=>'URL untuk menerima notifikasi'],
             ['name'=>'redirect_url','type'=>'string','required'=>false,'desc'=>'URL redirect setelah bayar'],
@@ -81,7 +81,7 @@ $appUrl = setting('app_url', app_url(''));
         <p class="text-sm text-slate-500 mb-4">Kosongkan <code class="bg-slate-200 px-1 rounded text-xs">payment_channel</code> agar customer memilih sendiri di halaman checkout, atau tentukan salah satu:</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left">Metode</th><th class="px-3 py-2 text-left">Tampilan</th></tr></thead><tbody>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS</td><td class="px-3 py-2 text-xs">QRIS</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS-A</td><td class="px-3 py-2 text-xs">QRIS</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BCAVA</td><td class="px-3 py-2 text-xs">VA BCA</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BNIVA</td><td class="px-3 py-2 text-xs">VA BNI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BRIVA</td><td class="px-3 py-2 text-xs">VA BRI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
