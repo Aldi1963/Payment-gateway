@@ -2,7 +2,8 @@
 /**
  * PayGate Pro - Installation Script
  * Run once to initialize database and create Super Admin account.
- * DELETE THIS FILE AFTER INSTALLATION!
+ * Auto-locks after successful installation (checks DB for existing admin).
+ * DELETE THIS FILE AFTER INSTALLATION for additional security!
  */
 
 // Check PHP version
@@ -27,20 +28,22 @@ $success = false;
 $step = $_POST['step'] ?? 'form';
 $alreadyInstalled = false;
 
-// Check if already installed by testing DB connection and user existence
+// AUTO-LOCK: Check if already installed by testing DB connection and user existence
 $dbConfigPath = __DIR__ . '/config/database.php';
-if (file_exists($dbConfigPath) && $step === 'form') {
+if (file_exists($dbConfigPath)) {
     try {
         $config = require $dbConfigPath;
-        $dsn = "mysql:host={$config['host']};port={$config['port']};dbname={$config['database']};charset={$config['charset']}";
-        $pdo = new PDO($dsn, $config['username'], $config['password'], $config['options']);
-        $stmt = $pdo->query("SELECT COUNT(*) FROM users");
-        $userCount = (int)$stmt->fetchColumn();
-        if ($userCount > 0) {
-            $alreadyInstalled = true;
+        if (!empty($config['host']) && !empty($config['database']) && !empty($config['username'])) {
+            $dsn = "mysql:host={$config['host']};port={$config['port']};dbname={$config['database']};charset={$config['charset']}";
+            $pdo = new PDO($dsn, $config['username'], $config['password'], $config['options'] ?? []);
+            $stmt = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'super_admin'");
+            $adminCount = (int)$stmt->fetchColumn();
+            if ($adminCount > 0) {
+                $alreadyInstalled = true;
+            }
         }
     } catch (\Throwable $e) {
-        // DB not configured yet, proceed with install
+        // DB not configured yet or tables don't exist, proceed with install
     }
 }
 

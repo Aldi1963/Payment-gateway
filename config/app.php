@@ -20,7 +20,7 @@ return [
     // Session
     'session_name' => 'paygate_session',
     'session_lifetime' => 7200, // 2 hours
-    'session_secure' => true,
+    'session_secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
     'session_httponly' => true,
 
     // Security

@@ -15,6 +15,7 @@ date_default_timezone_set('Asia/Jakarta');
 // Load helpers
 require_once dirname(__DIR__) . '/app/Helpers.php';
 require_once dirname(__DIR__) . '/app/Auth.php';
+require_once dirname(__DIR__) . '/includes/icons.php';
 
 // Initialize database connection
 require_once dirname(__DIR__) . '/app/Database.php';

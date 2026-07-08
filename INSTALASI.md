@@ -1,6 +1,6 @@
 # Panduan Instalasi PayGate Pro di cPanel Hosting
 
-Panduan ini menjelaskan langkah-langkah instalasi aplikasi PayGate Pro di shared hosting yang menggunakan cPanel. Tidak membutuhkan akses SSH, Composer, atau database MySQL.
+Panduan ini menjelaskan langkah-langkah instalasi aplikasi PayGate Pro di shared hosting yang menggunakan cPanel. Membutuhkan PHP 8.2+ dan MySQL/MariaDB. Tidak membutuhkan akses SSH atau Composer.
 
 ---
 
@@ -8,13 +8,13 @@ Panduan ini menjelaskan langkah-langkah instalasi aplikasi PayGate Pro di shared
 
 | Komponen | Minimum | Keterangan |
 |----------|---------|------------|
-| PHP | 8.2 atau lebih baru | Wajib. Cek di cPanel > Select PHP Version |
+| PHP | 8.2 atau lebih baru | **Wajib**. Cek di cPanel > Select PHP Version |
+| MySQL/MariaDB | 5.7+ / 10.3+ | **Wajib**. Buat database di cPanel > MySQL Databases |
 | Web Server | Apache + mod_rewrite | Sudah termasuk di semua cPanel hosting |
-| Ekstensi PHP | curl, json, mbstring, openssl | Biasanya sudah aktif default |
-| Database | **Tidak perlu** | Aplikasi menggunakan JSON file storage |
+| Ekstensi PHP | curl, json, mbstring, openssl, pdo, pdo_mysql | Pastikan aktif di Select PHP Version |
 | Composer | **Tidak perlu** | Tidak ada dependency external |
-| SSH | **Tidak perlu** | Semua bisa dilakukan via File Manager |
-| Disk Space | Minimal 50 MB | Untuk file aplikasi + data JSON |
+| SSH | **Tidak perlu** | Semua bisa dilakukan via File Manager & phpMyAdmin |
+| Disk Space | Minimal 50 MB | Untuk file aplikasi |
 
 ---
 
@@ -43,13 +43,36 @@ Pilih salah satu cara:
    - `json` (biasanya built-in, tidak perlu dicentang)
    - `mbstring`
    - `openssl`
+   - `pdo`
+   - `pdo_mysql`
 6. Klik **Save**
 
 > **Catatan:** Jika hosting Anda hanya menyediakan PHP 8.1 atau lebih rendah, aplikasi ini tidak akan berjalan. Hubungi provider hosting untuk upgrade.
 
 ---
 
-## Langkah 3: Upload File ke Hosting
+## Langkah 3: Buat Database MySQL
+
+1. Buka **cPanel > MySQL Databases**
+2. Di bagian **Create New Database**, masukkan nama database (misal: `paygate`)
+3. Klik **Create Database**
+4. Di bagian **Add New User**, buat user baru:
+   - Username: (misal: `paygate_user`)
+   - Password: (buat password yang kuat)
+5. Klik **Create User**
+6. Di bagian **Add User To Database**:
+   - Pilih user yang baru dibuat
+   - Pilih database yang baru dibuat
+   - Klik **Add**
+7. Di halaman privileges, centang **ALL PRIVILEGES**
+8. Klik **Make Changes**
+
+> **Catat** nama database, username, dan password — akan dibutuhkan di langkah installer.
+> Di cPanel, nama lengkap biasanya: `cpanelusername_namadb` dan `cpanelusername_namauser`.
+
+---
+
+## Langkah 4: Upload File ke Hosting
 
 1. Buka **cPanel > File Manager**
 2. Masuk ke folder tujuan instalasi:
