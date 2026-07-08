@@ -481,3 +481,65 @@ function is_valid_json(string $string): bool
     json_decode($string);
     return json_last_error() === JSON_ERROR_NONE;
 }
+
+/**
+ * Validate webhook URL is safe (not targeting internal/private networks).
+ * SECURITY: Prevents SSRF attacks by blocking private IPs, loopback,
+ * link-local (AWS metadata), and reserved address ranges.
+ *
+ * @param string $url URL to validate
+ * @return array ['safe' => bool, 'reason' => string]
+ */
+function validate_webhook_url(string $url): array
+{
+    // Must be a valid URL
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return ['safe' => false, 'reason' => 'URL tidak valid.'];
+    }
+
+    // Must use http or https
+    $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?? '');
+    if (!in_array($scheme, ['http', 'https'])) {
+        return ['safe' => false, 'reason' => 'Hanya http/https yang diizinkan.'];
+    }
+
+    $host = parse_url($url, PHP_URL_HOST);
+    if (empty($host)) {
+        return ['safe' => false, 'reason' => 'Host tidak valid.'];
+    }
+
+    // Block obvious localhost variants
+    $blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'];
+    if (in_array(strtolower($host), $blockedHosts)) {
+        return ['safe' => false, 'reason' => 'Tidak boleh mengarah ke localhost.'];
+    }
+
+    // Resolve hostname to IP
+    $ip = gethostbyname($host);
+    if ($ip === $host && !filter_var($host, FILTER_VALIDATE_IP)) {
+        // DNS resolution failed
+        return ['safe' => false, 'reason' => 'Host tidak dapat di-resolve.'];
+    }
+
+    // If host is already an IP, use it directly
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        $ip = $host;
+    }
+
+    // Block private and reserved IP ranges
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+        return ['safe' => false, 'reason' => 'URL tidak boleh mengarah ke jaringan internal/private.'];
+    }
+
+    // Block link-local (169.254.x.x - AWS/cloud metadata endpoint)
+    if (str_starts_with($ip, '169.254.')) {
+        return ['safe' => false, 'reason' => 'URL tidak boleh mengarah ke link-local address.'];
+    }
+
+    // Block loopback range (127.0.0.0/8)
+    if (str_starts_with($ip, '127.')) {
+        return ['safe' => false, 'reason' => 'URL tidak boleh mengarah ke loopback.'];
+    }
+
+    return ['safe' => true, 'reason' => ''];
+}

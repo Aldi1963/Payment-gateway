@@ -607,6 +607,12 @@ class ApiController
             json_response(['error' => 'Bad Request', 'message' => 'No webhook URL configured for this merchant'], 400);
         }
 
+        // SECURITY: Validate webhook URL is not targeting internal networks (SSRF protection)
+        $urlCheck = validate_webhook_url($webhookUrl);
+        if (!$urlCheck['safe']) {
+            json_response(['error' => 'Bad Request', 'message' => 'Webhook URL is not safe: ' . $urlCheck['reason']], 400);
+        }
+
         // Build test payload
         $testPayload = json_encode([
             'event' => 'test',

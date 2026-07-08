@@ -25,6 +25,17 @@ if (is_post()) {
 
     if ($action === 'retry' && !empty($_POST['retry_id'])) {
         $retryId = $_POST['retry_id'] ?? '';
+        // SECURITY: Verify the retry record belongs to this merchant (prevent IDOR)
+        $record = $retryRepo->find($retryId);
+        if (!$record || ($record['merchant_id'] ?? '') !== $merchantId) {
+            flash('error', 'Webhook tidak ditemukan atau akses ditolak.');
+            redirect('/merchant/webhook-logs.php');
+        }
+        // Only allow retry on failed records
+        if (($record['status'] ?? '') !== 'failed') {
+            flash('error', 'Hanya webhook yang gagal yang bisa di-retry.');
+            redirect('/merchant/webhook-logs.php');
+        }
         // Reset status to pending for re-processing
         $retryRepo->update($retryId, [
             'status' => 'pending',

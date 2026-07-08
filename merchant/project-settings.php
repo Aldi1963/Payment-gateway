@@ -118,8 +118,13 @@ if (is_post()) {
         redirect("/merchant/project-settings.php?id={$projectId}&tab=webhook");
     }
 
-    // --- Webhook Tab: Update IP Whitelist ---
+    // --- Webhook Tab: Update IP Whitelist (requires password) ---
     if ($activeTab === 'webhook' && $action === 'update_ip_whitelist') {
+        $password = $_POST['confirm_password'] ?? '';
+        if (!$configService->verifyPassword(Auth::id(), $password)) {
+            flash('error', 'Password tidak valid. Verifikasi gagal.');
+            redirect("/merchant/project-settings.php?id={$projectId}&tab=webhook");
+        }
         $result = $projectService->update(Auth::id(), $projectId, [
             'ip_whitelist' => $_POST['ip_whitelist'] ?? '',
         ]);
@@ -398,7 +403,11 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                 <textarea name="ip_whitelist" rows="4" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="103.10.10.1&#10;103.10.10.2/24"><?= e($project['ip_whitelist'] ?? '') ?></textarea>
                 <p class="text-xs text-slate-400 mt-1">Satu IP per baris (mendukung CIDR). Kosongkan untuk mengizinkan semua IP.</p>
             </div>
-            <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan IP Whitelist</button>
+            <div class="mb-3">
+                <label class="block text-xs text-slate-500 mb-1">Konfirmasi Password <span class="text-red-500">*</span></label>
+                <input type="password" name="confirm_password" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm" placeholder="Masukkan password untuk konfirmasi">
+            </div>
+            <button type="submit" onclick="return confirm('Simpan perubahan IP Whitelist?')" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan IP Whitelist</button>
         </form>
     </div>
 

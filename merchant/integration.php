@@ -32,6 +32,13 @@ if (is_post() && $activeTab === 'test') {
         flash('error', 'Webhook URL belum dikonfigurasi. Atur di Project Settings.');
         redirect('/merchant/integration.php?tab=test');
     }
+
+    // SECURITY: Validate webhook URL is not targeting internal networks (SSRF protection)
+    $urlCheck = validate_webhook_url($webhookUrl);
+    if (!$urlCheck['safe']) {
+        flash('error', 'Webhook URL tidak aman: ' . $urlCheck['reason']);
+        redirect('/merchant/integration.php?tab=test');
+    }
     $testPayload = [
         'event' => 'payment.test',
         'transaction_id' => 'test-' . generate_random(8),
