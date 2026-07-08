@@ -279,6 +279,30 @@ curl -X POST https://yourdomain.com/webhook.php \
 4. Review dan approve settlement
 5. Mark complete setelah transfer dilakukan
 
+## Update & Migrasi Database
+
+Setiap kali update kode (git pull / upload versi baru), **wajib** jalankan migrasi
+database agar schema sinkron dengan kode:
+
+```bash
+php scripts/migrate.php
+```
+
+Perintah lain:
+
+```bash
+php scripts/migrate.php status     # lihat migrasi sudah/belum diterapkan
+php scripts/migrate.php --pretend  # simulasi tanpa mengubah DB
+```
+
+- Migrasi bersifat **idempotent** (aman dijalankan berulang) dan dicatat di tabel
+  `schema_migrations` sehingga tidak dijalankan ulang.
+- Instalasi baru via `install.php` menjalankan migrasi otomatis.
+- Cek status schema kapan saja di `GET /api/health.php` (field `database_schema`).
+
+File migrasi berada di `migrations/` dan `database/migrations/` dan dijalankan
+berurutan sesuai nama file.
+
 ## Merchant API Reference
 
 ### Authentication

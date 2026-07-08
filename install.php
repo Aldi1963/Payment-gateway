@@ -146,6 +146,23 @@ if ($step === 'install' && !$alreadyInstalled) {
         file_put_contents($configDir . '/database.php', $configContent, LOCK_EX);
         $success = true;
     }
+
+    if (!$error) {
+        // Step 5: Record all migrations as applied (base schema already loaded
+        // from database.sql). This populates schema_migrations so future
+        // `php scripts/migrate.php` runs only apply genuinely new migrations.
+        try {
+            define('MIGRATE_BOOTSTRAP', true);
+            require_once __DIR__ . '/app/Database.php';
+            require_once __DIR__ . '/app/Schema.php';
+            require_once __DIR__ . '/scripts/migrate.php';
+            // Apply any pending migrations (idempotent — tolerates existing objects)
+            Migrator::runPending(false);
+        } catch (\Throwable $e) {
+            // Non-fatal: base install succeeded. Log for visibility.
+            error_log('Migration runner during install failed: ' . $e->getMessage());
+        }
+    }
 }
 ?>
 <!DOCTYPE html>

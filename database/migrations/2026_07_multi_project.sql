@@ -4,24 +4,26 @@
 -- Each user can own multiple projects (stores). Each project = 1 merchant.
 -- New projects start as 'pending' and must be verified by an admin.
 -- Each project has its own API key, webhook, IP whitelist, and WA integration.
+--
+-- IDEMPOTENT: Each ALTER is a single-column/single-key statement so the
+-- migration runner can skip individual pieces that already exist
+-- (MySQL error 1060/1061) without aborting the whole migration.
 -- =====================================================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------------
--- 1. Add project fields to merchants
---    (slug for short URL, owner_id for the creating user)
+-- 1. Add project fields to merchants (one statement per column/key)
 -- ---------------------------------------------------------------------
-ALTER TABLE `merchants`
-    ADD COLUMN `slug` VARCHAR(100) NULL DEFAULT NULL AFTER `business_name`,
-    ADD COLUMN `owner_id` VARCHAR(36) NULL DEFAULT NULL AFTER `slug`,
-    ADD COLUMN `mode` ENUM('sandbox','production') NOT NULL DEFAULT 'sandbox' AFTER `status`,
-    ADD COLUMN `rejection_reason` TEXT NULL DEFAULT NULL AFTER `mode`,
-    ADD COLUMN `verified_at` DATETIME NULL DEFAULT NULL AFTER `rejection_reason`,
-    ADD COLUMN `verified_by` VARCHAR(36) NULL DEFAULT NULL AFTER `verified_at`,
-    ADD UNIQUE KEY `uk_merchants_slug` (`slug`),
-    ADD KEY `idx_merchants_owner_id` (`owner_id`);
+ALTER TABLE `merchants` ADD COLUMN `slug` VARCHAR(100) NULL DEFAULT NULL AFTER `business_name`;
+ALTER TABLE `merchants` ADD COLUMN `owner_id` VARCHAR(36) NULL DEFAULT NULL AFTER `slug`;
+ALTER TABLE `merchants` ADD COLUMN `mode` ENUM('sandbox','production') NOT NULL DEFAULT 'sandbox' AFTER `status`;
+ALTER TABLE `merchants` ADD COLUMN `rejection_reason` TEXT NULL DEFAULT NULL AFTER `mode`;
+ALTER TABLE `merchants` ADD COLUMN `verified_at` DATETIME NULL DEFAULT NULL AFTER `rejection_reason`;
+ALTER TABLE `merchants` ADD COLUMN `verified_by` VARCHAR(36) NULL DEFAULT NULL AFTER `verified_at`;
+ALTER TABLE `merchants` ADD UNIQUE KEY `uk_merchants_slug` (`slug`);
+ALTER TABLE `merchants` ADD KEY `idx_merchants_owner_id` (`owner_id`);
 
 -- ---------------------------------------------------------------------
 -- 2. user_merchants pivot: 1 user -> many projects (merchants)
@@ -74,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `merchant_wa_configs` (
 
 -- ---------------------------------------------------------------------
 -- 4. Data migration: link existing users to their merchant (backfill)
---    Every existing user.merchant_id becomes a user_merchants row (owner, default).
+--    Idempotent: NOT EXISTS guard + WHERE IS NULL guards.
 -- ---------------------------------------------------------------------
 INSERT INTO `user_merchants` (`id`, `user_id`, `merchant_id`, `role`, `is_default`, `created_at`, `updated_at`)
 SELECT
@@ -86,26 +88,30 @@ WHERE u.`merchant_id` IS NOT NULL
       WHERE um.`user_id` = u.`id` AND um.`merchant_id` = u.`merchant_id`
   );
 
--- Backfill owner_id on merchants from the linked user
 UPDATE `merchants` m
 JOIN `users` u ON u.`merchant_id` = m.`id`
 SET m.`owner_id` = u.`id`
 WHERE m.`owner_id` IS NULL;
 
--- Backfill slug from business_name for existing merchants (lowercased, alnum only)
 UPDATE `merchants`
 SET `slug` = CONCAT(
         LOWER(REGEXP_REPLACE(`business_name`, '[^a-zA-Z0-9]', '')),
         '-', SUBSTRING(REPLACE(`id`, '-', ''), 1, 6)
     )
-WHERE `slug` IS NULL;
+WHERE `slug` IS NULL OR `slug` = '';
 
 -- ---------------------------------------------------------------------
--- 5. New settings for multi-project
+-- 5. New settings for multi-project (idempotent via ON DUPLICATE KEY)
 -- ---------------------------------------------------------------------
 INSERT INTO `settings` (`id`, `key`, `value`, `created_at`, `updated_at`) VALUES
-(UUID(), 'max_projects_per_user', '20', NOW(), NOW()),
-(UUID(), 'require_admin_verification', '1', NOW(), NOW()),
+(UUID(), 'max_projects_per_user', '20', NOW(), NOW())
+ON DUPLICATE KEY UPDATE `updated_at` = NOW();
+
+INSERT INTO `settings` (`id`, `key`, `value`, `created_at`, `updated_at`) VALUES
+(UUID(), 'require_admin_verification', '1', NOW(), NOW())
+ON DUPLICATE KEY UPDATE `updated_at` = NOW();
+
+INSERT INTO `settings` (`id`, `key`, `value`, `created_at`, `updated_at`) VALUES
 (UUID(), 'wa_default_template_payment', 'Halo {customer}! Pembayaran untuk order *{order_id}* sebesar *{amount}* telah *{status}*. Terima kasih telah bertransaksi di {project}.', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `updated_at` = NOW();
 

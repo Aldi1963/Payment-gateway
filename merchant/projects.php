@@ -27,6 +27,7 @@ if (is_post()) {
 
 $projects = $controller->listProjects();
 $activeId = Auth::merchantId();
+$isMigrated = $controller->projectsMigrated();
 
 $pageTitle = 'Proyek';
 require_once __DIR__ . '/../includes/header.php';
@@ -44,15 +45,35 @@ function project_status_label(string $status): string {
 }
 ?>
 
+<?php if (!$isMigrated): ?>
+<!-- Migration warning banner -->
+<div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div>
+            <p class="text-sm font-semibold text-amber-800">Database belum dimigrasi</p>
+            <p class="text-sm text-amber-700 mt-1">Fitur multi-proyek membutuhkan migrasi database. Saat ini aplikasi berjalan dalam mode toko tunggal (legacy). Jalankan perintah berikut di server:</p>
+            <pre class="mt-2 px-3 py-2 bg-amber-100 text-amber-900 rounded text-xs font-mono">php scripts/migrate.php</pre>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Header + Create button -->
 <div class="flex items-center justify-between mb-6">
     <div>
         <h3 class="text-xl font-semibold text-slate-800">Proyek</h3>
         <p class="text-sm text-slate-500 mt-1">Kelola beberapa toko/proyek dalam satu akun. Tiap proyek punya API key, webhook, dan integrasi WhatsApp sendiri.</p>
     </div>
+    <?php if ($isMigrated): ?>
     <button onclick="openCreateModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
         + Buat Proyek
     </button>
+    <?php else: ?>
+    <button disabled title="Jalankan migrasi database terlebih dahulu" class="px-4 py-2 bg-slate-300 text-white rounded-lg text-sm font-medium cursor-not-allowed whitespace-nowrap">
+        + Buat Proyek
+    </button>
+    <?php endif; ?>
 </div>
 
 <!-- Projects Table -->

@@ -14,9 +14,11 @@
  *   - getActive()      -> currently selected project
  */
 
+require_once base_path('app/Schema.php');
 require_once base_path('app/Repositories/MerchantRepository.php');
 require_once base_path('app/Repositories/UserMerchantRepository.php');
 require_once base_path('app/Repositories/WalletRepository.php');
+require_once base_path('app/Repositories/UserRepository.php');
 require_once base_path('app/Services/AuditLogService.php');
 
 class ProjectService
@@ -35,11 +37,57 @@ class ProjectService
     }
 
     /**
+     * Whether the multi-project database schema has been migrated.
+     * When false, the app runs in legacy single-merchant mode.
+     */
+    public function isMigrated(): bool
+    {
+        return Schema::multiProjectReady();
+    }
+
+    /**
+     * Standard error payload for when the DB hasn't been migrated yet.
+     */
+    private function notMigratedError(): array
+    {
+        return [
+            'success' => false,
+            'not_migrated' => true,
+            'message' => 'Database belum dimigrasi untuk fitur multi-proyek. Jalankan: php scripts/migrate.php',
+        ];
+    }
+
+    /**
+     * Legacy fallback: return the user's single merchant (users.merchant_id)
+     * as a one-item project list when the pivot table is not available.
+     */
+    private function legacyProjects(string $userId): array
+    {
+        try {
+            $user = (new UserRepository())->find($userId);
+            $merchantId = $user['merchant_id'] ?? null;
+            if (!$merchantId) return [];
+            $merchant = $this->merchantRepo->find($merchantId);
+            if (!$merchant) return [];
+            $merchant['access_role'] = 'owner';
+            $merchant['is_default'] = 1;
+            $merchant['slug'] = $merchant['slug'] ?? '';
+            return [$merchant];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * List all projects owned/accessible by a user.
      * Returns merchant rows with access_role and is_default.
+     * Falls back to legacy single-merchant mode if not migrated.
      */
     public function listByUser(string $userId): array
     {
+        if (!$this->isMigrated()) {
+            return $this->legacyProjects($userId);
+        }
         return $this->userMerchantRepo->getProjectsForUser($userId);
     }
 
@@ -48,6 +96,9 @@ class ProjectService
      */
     public function countByUser(string $userId): int
     {
+        if (!$this->isMigrated()) {
+            return count($this->legacyProjects($userId));
+        }
         return $this->userMerchantRepo->countForUser($userId);
     }
 
@@ -60,6 +111,11 @@ class ProjectService
      */
     public function create(string $userId, array $data): array
     {
+        // Guard: multi-project schema must be migrated
+        if (!$this->isMigrated()) {
+            return $this->notMigratedError();
+        }
+
         $name = trim($data['name'] ?? $data['business_name'] ?? '');
 
         // 1. Validate name
@@ -172,6 +228,9 @@ class ProjectService
      */
     public function switchActive(string $userId, string $merchantId): array
     {
+        if (!$this->isMigrated()) {
+            return $this->notMigratedError();
+        }
         if (!$this->userMerchantRepo->userHasAccess($userId, $merchantId)) {
             return ['success' => false, 'message' => 'Anda tidak memiliki akses ke proyek ini.'];
         }
@@ -191,6 +250,12 @@ class ProjectService
      */
     public function getActive(string $userId): ?array
     {
+        // Legacy mode: use users.merchant_id directly
+        if (!$this->isMigrated()) {
+            $legacy = $this->legacyProjects($userId);
+            return $legacy[0] ?? null;
+        }
+
         $activeId = $_SESSION['active_merchant_id'] ?? $_SESSION['merchant_id'] ?? null;
 
         // Verify the active project still belongs to the user
@@ -227,6 +292,11 @@ class ProjectService
      */
     public function userOwns(string $userId, string $merchantId): bool
     {
+        if (!$this->isMigrated()) {
+            // Legacy: user owns their single merchant_id
+            $user = (new UserRepository())->find($userId);
+            return ($user['merchant_id'] ?? null) === $merchantId;
+        }
         return $this->userMerchantRepo->userHasAccess($userId, $merchantId);
     }
 

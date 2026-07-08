@@ -417,6 +417,67 @@ File *.json di dalam storage/ → Permission 664 atau 666
 
 ---
 
+## Update Aplikasi & Migrasi Database (WAJIB setelah update)
+
+Setiap kali menarik kode baru (git pull / upload versi baru), **wajib** menjalankan
+migrasi database agar struktur tabel sinkron dengan kode. Jika tidak, halaman
+tertentu bisa error 500 karena kode memakai tabel/kolom yang belum ada.
+
+### Cara menjalankan migrasi
+
+**Via SSH / Terminal cPanel** (direkomendasikan):
+
+```bash
+cd /home/USERNAME/public_html
+php scripts/migrate.php
+```
+
+Output contoh:
+```
+Applied 1 migration(s):
+  - 2026_07_multi_project.sql (12 run, 0 skipped)
+Already applied: 2 migration(s).
+```
+
+### Perintah yang tersedia
+
+| Perintah | Fungsi |
+|----------|--------|
+| `php scripts/migrate.php` | Jalankan semua migrasi yang belum diterapkan |
+| `php scripts/migrate.php status` | Lihat daftar migrasi (sudah/belum diterapkan) |
+| `php scripts/migrate.php --pretend` | Simulasi (lihat yang akan dijalankan, tanpa mengubah DB) |
+
+### Catatan penting
+
+- Migration **aman dijalankan berulang** (idempotent). Menjalankan dua kali tidak
+  akan menyebabkan error "Duplicate column" — statement yang objeknya sudah ada
+  otomatis dilewati.
+- Migrasi yang sudah dijalankan dicatat di tabel `schema_migrations`, sehingga
+  tidak akan dijalankan ulang.
+- Saat instalasi baru via `install.php`, migrasi otomatis dijalankan — Anda tidak
+  perlu menjalankannya manual pada instalasi pertama.
+- Jika hosting **tidak punya akses SSH**, jalankan migrasi lewat installer ulang
+  atau minta provider menjalankan `php scripts/migrate.php`. Anda juga bisa
+  mengecek status schema di endpoint `GET /api/health.php` (lihat bagian
+  `database_schema`).
+
+### Cek kesehatan schema
+
+Buka `https://domainanda.com/api/health.php`. Bagian `database_schema` menunjukkan
+apakah ada migrasi yang tertunda:
+
+```json
+"database_schema": {
+    "status": "unhealthy",
+    "pending_migrations": ["2026_07_multi_project.sql"],
+    "message": "Schema drift detected. Run: php scripts/migrate.php"
+}
+```
+
+Jika `status` = `healthy`, schema sudah sinkron.
+
+---
+
 ## Instalasi di Subdomain
 
 Jika ingin menginstall di subdomain (misalnya `pay.domainanda.com`):

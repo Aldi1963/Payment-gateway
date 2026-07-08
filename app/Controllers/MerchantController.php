@@ -83,6 +83,14 @@ class MerchantController
         return $this->projectService->getActive(Auth::id());
     }
 
+    /**
+     * Whether the multi-project DB schema has been migrated.
+     */
+    public function projectsMigrated(): bool
+    {
+        return $this->projectService->isMigrated();
+    }
+
     // ==============================
     // WHATSAPP INTEGRATION (per project)
     // ==============================

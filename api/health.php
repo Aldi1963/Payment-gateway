@@ -47,6 +47,60 @@ try {
 }
 
 // ============================================
+// 1b. DATABASE SCHEMA CHECK (migration drift)
+// ============================================
+if (($checks['database']['status'] ?? '') === 'healthy') {
+    try {
+        require_once base_path('app/Schema.php');
+
+        // Critical tables/columns that code depends on
+        $required = [
+            'table:user_merchants' => Schema::hasTable('user_merchants'),
+            'table:merchant_wa_configs' => Schema::hasTable('merchant_wa_configs'),
+            'table:schema_migrations' => Schema::hasTable('schema_migrations'),
+            'column:merchants.slug' => Schema::hasColumn('merchants', 'slug'),
+            'column:merchants.owner_id' => Schema::hasColumn('merchants', 'owner_id'),
+        ];
+
+        $missing = array_keys(array_filter($required, fn($v) => $v === false));
+
+        // Determine pending migrations if tracking table exists
+        $pendingMigrations = [];
+        if (Schema::hasTable('schema_migrations')) {
+            try {
+                if (!defined('MIGRATE_BOOTSTRAP')) define('MIGRATE_BOOTSTRAP', true);
+                require_once base_path('scripts/migrate.php');
+                foreach (Migrator::status() as $row) {
+                    if (!$row['applied']) $pendingMigrations[] = $row['migration'];
+                }
+            } catch (\Throwable $e) {
+                // ignore — status best-effort
+            }
+        }
+
+        if (empty($missing) && empty($pendingMigrations)) {
+            $checks['database_schema'] = [
+                'status' => 'healthy',
+                'message' => 'Schema up to date',
+            ];
+        } else {
+            $checks['database_schema'] = [
+                'status' => 'unhealthy',
+                'missing' => $missing,
+                'pending_migrations' => $pendingMigrations,
+                'message' => 'Schema drift detected. Run: php scripts/migrate.php',
+            ];
+            $overallStatus = 'unhealthy';
+        }
+    } catch (\Throwable $e) {
+        $checks['database_schema'] = [
+            'status' => 'unknown',
+            'message' => 'Schema check failed',
+        ];
+    }
+}
+
+// ============================================
 // 2. PAYMENT PROVIDER: AldiQRIS
 // ============================================
 $aldiqrisUrl = setting('aldiqris_base_url', config('gateway.aldiqris.base_url', ''));
