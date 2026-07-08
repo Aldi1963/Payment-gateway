@@ -21,11 +21,25 @@ if (is_post()) {
         $settingRepo->set('per_page', (int)($_POST['per_page'] ?? 20));
         $settingRepo->set('maintenance_mode', isset($_POST['maintenance_mode']) ? '1' : '0');
     } elseif ($tab === 'gateway') {
+        // AldiQRIS
         $settingRepo->set('aldiqris_base_url', sanitize($_POST['aldiqris_base_url'] ?? ''));
         $settingRepo->set('aldiqris_api_key', $_POST['aldiqris_api_key'] ?? '');
         $settingRepo->set('aldiqris_timeout', (int)($_POST['aldiqris_timeout'] ?? 30));
         $settingRepo->set('aldiqris_ssl_verify', isset($_POST['aldiqris_ssl_verify']) ? '1' : '0');
         $settingRepo->set('aldiqris_endpoint', sanitize($_POST['aldiqris_endpoint'] ?? '/api/trx'));
+        
+        // Midtrans
+        $settingRepo->set('channel_midtrans_enabled', isset($_POST['channel_midtrans_enabled']) ? '1' : '0');
+        $settingRepo->set('midtrans_server_key', $_POST['midtrans_server_key'] ?? '');
+        $settingRepo->set('midtrans_client_key', $_POST['midtrans_client_key'] ?? '');
+        $settingRepo->set('midtrans_is_production', $_POST['midtrans_is_production'] ?? '0');
+        $settingRepo->set('midtrans_expiry_minutes', (int)($_POST['midtrans_expiry_minutes'] ?? 60));
+        
+        // Midtrans payment methods
+        $midtransMethods = ['credit_card','bca_va','bni_va','bri_va','mandiri_bill','permata_va','cimb_va','gopay','shopeepay','qris','alfamart','indomaret','akulaku','kredivo'];
+        foreach ($midtransMethods as $method) {
+            $settingRepo->set("midtrans_{$method}_enabled", isset($_POST["midtrans_{$method}_enabled"]) ? '1' : '0');
+        }
     } elseif ($tab === 'fees') {
         $settingRepo->set('default_fee_type', $_POST['default_fee_type'] ?? 'percentage');
         $settingRepo->set('default_fee_value', (float)($_POST['default_fee_value'] ?? 0.7));
@@ -162,36 +176,125 @@ require_once __DIR__ . '/../includes/admin_layout.php';
 
 <?php elseif ($activeTab === 'gateway'): ?>
 <!-- GATEWAY API SETTINGS -->
-<h3 class="text-lg font-semibold text-slate-800 mb-2">Konfigurasi Gateway API (AldiQRIS)</h3>
-<p class="text-sm text-slate-500 mb-6">Pengaturan koneksi ke AldiQRIS payment gateway.</p>
+<h3 class="text-lg font-semibold text-slate-800 mb-2">Payment Gateway</h3>
+<p class="text-sm text-slate-500 mb-6">Konfigurasi koneksi ke provider pembayaran.</p>
 <form method="POST" class="space-y-5">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="gateway">
-    <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Base URL</label>
-        <input type="url" name="aldiqris_base_url" value="<?= e($s['aldiqris_base_url'] ?? 'https://aldiqris.pages.dev') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-        <p class="text-xs text-slate-400 mt-1">Default: https://aldiqris.pages.dev</p>
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">API Key (Global/Default)</label>
-        <input type="password" name="aldiqris_api_key" value="<?= e($s['aldiqris_api_key'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono" placeholder="gopay_xxxx...">
-        <p class="text-xs text-slate-400 mt-1">Digunakan jika merchant belum set API key sendiri.</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Endpoint Create Transaction</label>
-            <input type="text" name="aldiqris_endpoint" value="<?= e($s['aldiqris_endpoint'] ?? '/api/trx') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-mono">
+
+    <!-- AldiQRIS Section -->
+    <div class="p-5 bg-blue-50 border border-blue-200 rounded-xl">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                </div>
+                <h4 class="text-sm font-bold text-blue-900">AldiQRIS (QRIS)</h4>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Primary</span>
         </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Timeout (detik)</label>
-            <input type="number" name="aldiqris_timeout" value="<?= e($s['aldiqris_timeout'] ?? 30) ?>" min="5" max="120" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Base URL</label>
+                <input type="url" name="aldiqris_base_url" value="<?= e($s['aldiqris_base_url'] ?? 'https://aldiqris.pages.dev') ?>" class="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">API Key</label>
+                <input type="password" name="aldiqris_api_key" value="<?= e($s['aldiqris_api_key'] ?? '') ?>" class="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm font-mono bg-white" placeholder="API key dari AldiQRIS">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Endpoint</label>
+                    <input type="text" name="aldiqris_endpoint" value="<?= e($s['aldiqris_endpoint'] ?? '/api/trx') ?>" class="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm font-mono bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Timeout (s)</label>
+                    <input type="number" name="aldiqris_timeout" value="<?= e($s['aldiqris_timeout'] ?? 30) ?>" min="5" max="120" class="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white">
+                </div>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="aldiqris_ssl_verify" value="1" <?= ($s['aldiqris_ssl_verify'] ?? '1') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                <span class="text-xs text-slate-700">SSL Verification (aktifkan di production)</span>
+            </label>
         </div>
     </div>
-    <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="aldiqris_ssl_verify" value="1" <?= ($s['aldiqris_ssl_verify'] ?? '1') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-blue-600">
-        <span class="text-sm text-slate-700">SSL Verification (aktifkan di production)</span>
-    </label>
-    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+
+    <!-- Midtrans Section -->
+    <div class="p-5 bg-indigo-50 border border-indigo-200 rounded-xl">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+                <h4 class="text-sm font-bold text-indigo-900">Midtrans (Multi-Payment)</h4>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="channel_midtrans_enabled" value="1" <?= ($s['channel_midtrans_enabled'] ?? '0') === '1' ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-300 text-indigo-600">
+                <span class="text-xs font-medium text-indigo-700">Aktif</span>
+            </label>
+        </div>
+        <div class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Server Key</label>
+                    <input type="password" name="midtrans_server_key" value="<?= e($s['midtrans_server_key'] ?? '') ?>" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm font-mono bg-white" placeholder="SB-Mid-server-xxx...">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Client Key</label>
+                    <input type="password" name="midtrans_client_key" value="<?= e($s['midtrans_client_key'] ?? '') ?>" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm font-mono bg-white" placeholder="SB-Mid-client-xxx...">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Environment</label>
+                    <select name="midtrans_is_production" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm bg-white">
+                        <option value="0" <?= ($s['midtrans_is_production'] ?? '0') === '0' ? 'selected' : '' ?>>Sandbox (Testing)</option>
+                        <option value="1" <?= ($s['midtrans_is_production'] ?? '0') === '1' ? 'selected' : '' ?>>Production (Live)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Expiry (menit)</label>
+                    <input type="number" name="midtrans_expiry_minutes" value="<?= e($s['midtrans_expiry_minutes'] ?? 60) ?>" min="5" max="1440" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm bg-white">
+                </div>
+            </div>
+
+            <!-- Payment Methods Toggle -->
+            <div class="pt-3 border-t border-indigo-100">
+                <p class="text-xs font-medium text-slate-700 mb-2">Metode Pembayaran Aktif:</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <?php
+                    $midtransMethods = [
+                        'credit_card' => 'Kartu Kredit/Debit',
+                        'bca_va' => 'VA BCA',
+                        'bni_va' => 'VA BNI',
+                        'bri_va' => 'VA BRI',
+                        'mandiri_bill' => 'Mandiri Bill',
+                        'permata_va' => 'VA Permata',
+                        'cimb_va' => 'VA CIMB',
+                        'gopay' => 'GoPay',
+                        'shopeepay' => 'ShopeePay',
+                        'qris' => 'QRIS',
+                        'alfamart' => 'Alfamart',
+                        'indomaret' => 'Indomaret',
+                        'akulaku' => 'Akulaku',
+                        'kredivo' => 'Kredivo',
+                    ];
+                    foreach ($midtransMethods as $code => $label): ?>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" name="midtrans_<?= $code ?>_enabled" value="1" <?= ($s["midtrans_{$code}_enabled"] ?? '1') === '1' ? 'checked' : '' ?> class="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600">
+                        <span class="text-xs text-slate-700"><?= $label ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="p-3 bg-indigo-100/50 rounded-lg">
+                <p class="text-xs text-indigo-700"><strong>Webhook:</strong> Set notification URL di Midtrans Dashboard ke: <code class="font-mono bg-white px-1 rounded"><?= e(app_url('webhook.php')) ?></code></p>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Semua Gateway</button>
 </form>
 
 
