@@ -55,17 +55,18 @@ if ($transaction) {
         $txService = new TransactionService();
 
         // Determine channel from method code
-        if (str_starts_with($selectMethod, 'midtrans_')) {
-            $channel = 'midtrans';
-            $method = $selectMethod;
-        } else {
+        // Simple codes: QRIS = aldiqris, everything else = midtrans
+        $upperMethod = strtoupper($selectMethod);
+        if ($upperMethod === 'QRIS') {
             $channel = 'qris';
             $method = null;
+        } else {
+            $channel = 'midtrans';
+            $method = $upperMethod;
         }
 
         $result = $txService->selectPaymentMethod($transaction['order_id'], $channel, $method);
         if ($result['success']) {
-            // Reload transaction
             $transaction = $txRepo->find($transaction['id']);
         } else {
             $selectError = $result['message'];
@@ -187,7 +188,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         // Add AldiQRIS as QRIS option
         if (isset($enabledChannels['qris'])) {
             $groups['qris']['methods'][] = [
-                'code' => 'qris',
+                'code' => 'QRIS',
                 'name' => 'QRIS (Semua Bank & E-Wallet)',
                 'desc' => 'GoPay, OVO, DANA, LinkAja, ShopeePay, dll',
                 'fee' => 'Fee 0.7%',
@@ -199,8 +200,8 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         if (isset($enabledChannels['midtrans'])) {
             $midtransMethods = $enabledChannels['midtrans']->getSupportedMethods();
             foreach ($midtransMethods as $m) {
-                $code = $m['code'];
-                if (str_contains($code, '_va') || str_contains($code, '_bill')) {
+                $code = $m['code']; // Already simple: BCAVA, BNIVA, etc.
+                if (in_array($code, ['BCAVA','BNIVA','BRIVA','PERMATAVA','CIMBVA','MANDIRI'])) {
                     $groups['va']['methods'][] = [
                         'code' => $code,
                         'name' => $m['name'],
@@ -208,7 +209,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         'fee' => 'Fee Rp 4.000',
                         'icon' => $m['icon'],
                     ];
-                } elseif (str_contains($code, 'qris')) {
+                } elseif ($code === 'MTQRIS') {
                     $groups['qris']['methods'][] = [
                         'code' => $code,
                         'name' => $m['name'],
@@ -216,20 +217,12 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         'fee' => 'Fee 0.7%',
                         'icon' => 'qris_mt',
                     ];
-                } elseif (in_array($m['icon'], ['gopay', 'shopeepay'])) {
+                } elseif (in_array($code, ['GOPAY','SHOPEEPAY'])) {
                     $groups['ewallet']['methods'][] = [
                         'code' => $code,
                         'name' => $m['name'],
                         'desc' => 'Deeplink ke aplikasi',
                         'fee' => 'Fee 2%',
-                        'icon' => $m['icon'],
-                    ];
-                } elseif (in_array($m['icon'], ['alfamart', 'indomaret'])) {
-                    $groups['store']['methods'][] = [
-                        'code' => $code,
-                        'name' => $m['name'],
-                        'desc' => 'Bayar di kasir',
-                        'fee' => 'Fee Rp 5.000',
                         'icon' => $m['icon'],
                     ];
                 }

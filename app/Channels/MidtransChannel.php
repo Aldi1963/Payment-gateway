@@ -47,23 +47,44 @@ class MidtransChannel implements PaymentChannelInterface
     public function getSupportedMethods(): array
     {
         $methods = [];
+        // Simple codes → display name, internal midtrans code for settings check
         $available = [
-            'bca_va' => 'VA BCA',
-            'bni_va' => 'VA BNI',
-            'bri_va' => 'VA BRI',
-            'permata_va' => 'VA Permata',
-            'mandiri_bill' => 'Mandiri Bill',
-            'cimb_va' => 'VA CIMB',
-            'gopay' => 'GoPay',
-            'shopeepay' => 'ShopeePay',
-            'qris' => 'QRIS (Midtrans)',
+            'BCAVA' => ['name' => 'VA BCA', 'setting' => 'bca_va', 'icon' => 'bca'],
+            'BNIVA' => ['name' => 'VA BNI', 'setting' => 'bni_va', 'icon' => 'bni'],
+            'BRIVA' => ['name' => 'VA BRI', 'setting' => 'bri_va', 'icon' => 'bri'],
+            'PERMATAVA' => ['name' => 'VA Permata', 'setting' => 'permata_va', 'icon' => 'permata'],
+            'MANDIRI' => ['name' => 'Mandiri Bill', 'setting' => 'mandiri_bill', 'icon' => 'mandiri'],
+            'CIMBVA' => ['name' => 'VA CIMB', 'setting' => 'cimb_va', 'icon' => 'cimb'],
+            'GOPAY' => ['name' => 'GoPay', 'setting' => 'gopay', 'icon' => 'gopay'],
+            'SHOPEEPAY' => ['name' => 'ShopeePay', 'setting' => 'shopeepay', 'icon' => 'shopeepay'],
+            'MTQRIS' => ['name' => 'QRIS (Midtrans)', 'setting' => 'qris', 'icon' => 'qris_mt'],
         ];
-        foreach ($available as $code => $name) {
-            if (setting("midtrans_{$code}_enabled", '1') === '1') {
-                $methods[] = ['code' => "midtrans_{$code}", 'name' => $name, 'icon' => str_replace('_va', '', $code)];
+        foreach ($available as $code => $info) {
+            if (setting("midtrans_{$info['setting']}_enabled", '1') === '1') {
+                $methods[] = ['code' => $code, 'name' => $info['name'], 'icon' => $info['icon']];
             }
         }
         return $methods;
+    }
+
+    /**
+     * Map simple method code to internal Midtrans payment type
+     */
+    private function mapMethodToInternal(string $code): string
+    {
+        return match(strtoupper($code)) {
+            'BCAVA' => 'bca_va',
+            'BNIVA' => 'bni_va',
+            'BRIVA' => 'bri_va',
+            'PERMATAVA' => 'permata_va',
+            'CIMBVA' => 'cimb_va',
+            'MANDIRI' => 'mandiri_bill',
+            'GOPAY' => 'gopay',
+            'SHOPEEPAY' => 'shopeepay',
+            'MTQRIS' => 'qris',
+            // Backward compat: old midtrans_xxx codes still work
+            default => str_replace('midtrans_', '', strtolower($code)),
+        };
     }
 
     /**
@@ -78,10 +99,10 @@ class MidtransChannel implements PaymentChannelInterface
 
         $orderId = $payload['order_id'] ?? generate_order_id();
         $amount = (int)($payload['amount'] ?? 0);
-        $method = $payload['payment_method'] ?? 'midtrans_bca_va';
+        $method = $payload['payment_method'] ?? 'BCAVA';
 
-        // Remove midtrans_ prefix for internal mapping
-        $methodCode = str_replace('midtrans_', '', $method);
+        // Map simple code to internal Midtrans payment type
+        $methodCode = $this->mapMethodToInternal($method);
 
         // Build Core API charge payload
         $chargePayload = [

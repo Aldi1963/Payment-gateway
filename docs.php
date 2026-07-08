@@ -221,16 +221,15 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         <table class="w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
             <thead><tr class="bg-slate-50"><th class="px-4 py-3 text-left font-semibold">Code</th><th class="px-4 py-3 text-left font-semibold">Channel</th><th class="px-4 py-3 text-left font-semibold">Metode</th><th class="px-4 py-3 text-left font-semibold">Tampilan di Checkout</th></tr></thead>
             <tbody class="divide-y divide-slate-100">
-                <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">qris</td><td class="px-4 py-3 text-slate-500 text-xs">qris</td><td class="px-4 py-3">QRIS (AldiQRIS)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_bca_va</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BCA</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_bni_va</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BNI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_bri_va</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BRI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_permata_va</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA Permata</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_cimb_va</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA CIMB Niaga</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_mandiri_bill</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">Mandiri Bill Payment</td><td class="px-4 py-3 text-slate-500 text-xs">Bill Key + Biller Code</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_qris</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">QRIS (Midtrans)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_gopay</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">GoPay</td><td class="px-4 py-3 text-slate-500 text-xs">QR + Deeplink</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">midtrans_shopeepay</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">ShopeePay</td><td class="px-4 py-3 text-slate-500 text-xs">Deeplink ke app</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BCAVA</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BCA</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BNIVA</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BNI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BRIVA</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA BRI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">PERMATAVA</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA Permata</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">CIMBVA</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">VA CIMB Niaga</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">MANDIRI</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">Mandiri Bill Payment</td><td class="px-4 py-3 text-slate-500 text-xs">Bill Key + Biller Code</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">MTQRIS</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">QRIS (Midtrans)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">GOPAY</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">GoPay</td><td class="px-4 py-3 text-slate-500 text-xs">QR + Deeplink</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">SHOPEEPAY</td><td class="px-4 py-3 text-slate-500 text-xs">midtrans</td><td class="px-4 py-3">ShopeePay</td><td class="px-4 py-3 text-slate-500 text-xs">Deeplink ke app</td></tr>
             </tbody>
         </table>
     </div>
@@ -263,7 +262,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
     "amount": 50000,
     "order_id": "INV-001",
     "payment_channel": "midtrans",
-    "payment_method": "midtrans_bca_va",
+    "payment_method": "BCAVA",
     "customer_name": "John Doe"
   }'</code></pre>
             </div>
@@ -282,7 +281,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
     "net_amount": 49650,
     "status": "PENDING",
     "payment_channel": "midtrans",
-    "payment_method": "midtrans_bca_va",
+    "payment_method": "BCAVA",
     "payment_url": "https://pay.../pay.php?order_id=INV-001",
     "qr_url": null,
     "created_at": "2026-07-08 10:00:00"
