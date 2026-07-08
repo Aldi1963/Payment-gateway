@@ -77,6 +77,26 @@ $appUrl = setting('app_url', app_url(''));
 
     <!-- Webhook Section -->
     <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-slate-800 mb-4">Payment Method Codes</h2>
+        <p class="text-sm text-slate-500 mb-4">Kosongkan <code class="bg-slate-200 px-1 rounded text-xs">payment_channel</code> agar customer memilih sendiri di halaman checkout, atau tentukan salah satu:</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left">Channel</th><th class="px-3 py-2 text-left">Metode</th></tr></thead><tbody>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">qris</td><td class="px-3 py-2 text-xs">qris</td><td class="px-3 py-2 text-xs">QRIS (AldiQRIS)</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_bca_va</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BCA</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_bni_va</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BNI</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_bri_va</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA BRI</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_permata_va</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA Permata</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_cimb_va</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">VA CIMB</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_mandiri_bill</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">Mandiri Bill</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_qris</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">QRIS (Midtrans)</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_gopay</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">GoPay</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">midtrans_shopeepay</td><td class="px-3 py-2 text-xs">midtrans</td><td class="px-3 py-2 text-xs">ShopeePay</td></tr>
+            </tbody></table>
+        </div>
+    </div>
+
+    <!-- Webhook Section -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
         <h2 class="text-xl font-bold text-slate-800 mb-4">Webhook Notifications</h2>
         <p class="text-sm text-slate-500 mb-4">Sistem akan mengirim POST request ke webhook URL Anda saat status pembayaran berubah.</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
