@@ -176,6 +176,23 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         $channelManager = PaymentChannelManager::getInstance();
         $enabledChannels = $channelManager->getEnabledChannels();
 
+        // Fee label helper — shows the real fee per method (Midtrans per-method
+        // combined fee when configured, else the default/global fee).
+        $feeSvc = new FeeService();
+        $txAmount = (int)($transaction['amount'] ?? 0);
+        $defaultFeeResult = $feeSvc->calculateTransaction($txAmount, $transaction['merchant_id'] ?? '');
+        $defaultFeeLabel = 'Biaya ' . format_currency($defaultFeeResult['fee']);
+        $feeLabelFor = function (?string $publicCode) use ($feeSvc, $txAmount, $defaultFeeLabel) {
+            if ($publicCode && $publicCode !== 'QRIS-A') {
+                $internal = FeeService::mapMidtransPublicToInternal($publicCode);
+                $mf = $internal ? $feeSvc->calculateMidtransMethodFee($txAmount, $internal) : null;
+                if ($mf !== null) {
+                    return 'Biaya ' . format_currency($mf['fee']);
+                }
+            }
+            return $defaultFeeLabel;
+        };
+
         // Group methods by category
         $groups = [
             'qris' => ['label' => 'QRIS', 'methods' => []],
@@ -190,7 +207,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                 'code' => 'QRIS-A',
                 'name' => 'QRIS',
                 'desc' => 'Scan QR dari semua e-wallet & mobile banking',
-                'fee' => 'Fee 0.7%',
+                'fee' => $feeLabelFor('QRIS-A'),
                 'icon' => 'qris',
             ];
         }
@@ -205,7 +222,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         'code' => $code,
                         'name' => $m['name'],
                         'desc' => 'Min Rp 10.000',
-                        'fee' => 'Fee Rp 4.000',
+                        'fee' => $feeLabelFor($code),
                         'icon' => $m['icon'],
                     ];
                 } elseif ($code === 'MTQRIS') {
@@ -213,7 +230,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         'code' => $code,
                         'name' => $m['name'],
                         'desc' => 'Scan QR dari semua e-wallet',
-                        'fee' => 'Fee 0.7%',
+                        'fee' => $feeLabelFor($code),
                         'icon' => 'qris_mt',
                     ];
                 } elseif (in_array($code, ['GOPAY','SHOPEEPAY'])) {
@@ -221,7 +238,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         'code' => $code,
                         'name' => $m['name'],
                         'desc' => 'Deeplink ke aplikasi',
-                        'fee' => 'Fee 2%',
+                        'fee' => $feeLabelFor($code),
                         'icon' => $m['icon'],
                     ];
                 }

@@ -46,6 +46,15 @@ if (is_post()) {
         $settingRepo->set('default_fee_flat', (float)($_POST['default_fee_flat'] ?? 0));
         $settingRepo->set('min_transaction_amount', (int)($_POST['min_transaction_amount'] ?? 1000));
         $settingRepo->set('max_transaction_amount', (int)($_POST['max_transaction_amount'] ?? 50000000));
+
+        // Per-method Midtrans fees: biaya Midtrans (provider) + biaya kita (platform)
+        $mtFeeMethods = ['bca_va','bni_va','bri_va','permata_va','cimb_va','mandiri_bill','gopay','shopeepay','qris'];
+        foreach ($mtFeeMethods as $mm) {
+            $settingRepo->set("mtfee_{$mm}_prov_flat", (float)($_POST["mtfee_{$mm}_prov_flat"] ?? 0));
+            $settingRepo->set("mtfee_{$mm}_prov_pct",  (float)($_POST["mtfee_{$mm}_prov_pct"] ?? 0));
+            $settingRepo->set("mtfee_{$mm}_plat_flat", (float)($_POST["mtfee_{$mm}_plat_flat"] ?? 0));
+            $settingRepo->set("mtfee_{$mm}_plat_pct",  (float)($_POST["mtfee_{$mm}_plat_pct"] ?? 0));
+        }
     } elseif ($tab === 'withdrawal') {
         $settingRepo->set('min_withdrawal', (int)($_POST['min_withdrawal'] ?? 10000));
         $settingRepo->set('max_withdrawal', (int)($_POST['max_withdrawal'] ?? 100000000));
@@ -358,6 +367,51 @@ require_once __DIR__ . '/../includes/admin_layout.php';
                 <input type="number" name="max_transaction_amount" value="<?= e($s['max_transaction_amount'] ?? 50000000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
             </div>
         </div>
+    </div>
+
+    <!-- Per-method Midtrans fees -->
+    <div class="border-t border-slate-200 pt-4">
+        <p class="text-sm font-medium text-slate-700 mb-1">Biaya Metode Midtrans</p>
+        <p class="text-xs text-slate-500 mb-3">Biaya yang dipotong per transaksi = <strong>Biaya Midtrans</strong> + <strong>Biaya Layanan Kita</strong>. Contoh VA: Midtrans Rp4.000 + Kita Rp500 = <strong>Rp4.500</strong>. Isi Rp untuk biaya tetap dan/atau % untuk biaya persentase. Kosongkan semua (0) agar metode memakai Default Fee di atas.</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm border border-slate-200 rounded-lg">
+                <thead class="bg-slate-50 text-slate-600">
+                    <tr>
+                        <th class="px-3 py-2 text-left font-medium">Metode</th>
+                        <th class="px-3 py-2 text-left font-medium">Midtrans Rp</th>
+                        <th class="px-3 py-2 text-left font-medium">Midtrans %</th>
+                        <th class="px-3 py-2 text-left font-medium">Kita Rp</th>
+                        <th class="px-3 py-2 text-left font-medium">Kita %</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <?php
+                    $mtFeeRows = [
+                        'bca_va' => ['VA BCA', 4000],
+                        'bni_va' => ['VA BNI', 4000],
+                        'bri_va' => ['VA BRI', 4000],
+                        'permata_va' => ['VA Permata', 4000],
+                        'cimb_va' => ['VA CIMB', 4000],
+                        'mandiri_bill' => ['Mandiri Bill', 4000],
+                        'gopay' => ['GoPay', 0],
+                        'shopeepay' => ['ShopeePay', 0],
+                        'qris' => ['QRIS (Midtrans)', 0],
+                    ];
+                    foreach ($mtFeeRows as $mm => $info):
+                        [$label, $phFlat] = $info;
+                    ?>
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-slate-700 whitespace-nowrap"><?= e($label) ?></td>
+                        <td class="px-2 py-1.5"><input type="number" step="1" min="0" name="mtfee_<?= $mm ?>_prov_flat" value="<?= e($s["mtfee_{$mm}_prov_flat"] ?? '') ?>" placeholder="<?= $phFlat ?>" class="w-24 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
+                        <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" name="mtfee_<?= $mm ?>_prov_pct" value="<?= e($s["mtfee_{$mm}_prov_pct"] ?? '') ?>" placeholder="0" class="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
+                        <td class="px-2 py-1.5"><input type="number" step="1" min="0" name="mtfee_<?= $mm ?>_plat_flat" value="<?= e($s["mtfee_{$mm}_plat_flat"] ?? '') ?>" placeholder="500" class="w-24 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
+                        <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" name="mtfee_<?= $mm ?>_plat_pct" value="<?= e($s["mtfee_{$mm}_plat_pct"] ?? '') ?>" placeholder="0" class="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">Berlaku untuk metode via Midtrans. QRIS AldiQRIS (provider utama) tetap memakai Default Fee di atas.</p>
     </div>
     <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
