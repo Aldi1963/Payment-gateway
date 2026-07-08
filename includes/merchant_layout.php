@@ -109,17 +109,17 @@ if ($userRole === 'staff_merchant') {
 ?>
         <!-- Topbar -->
         <header class="bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <button onclick="toggleSidebar()" class="lg:hidden text-slate-600 hover:text-slate-900">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                <button onclick="toggleSidebar()" class="lg:hidden text-slate-600 hover:text-slate-900 flex-shrink-0">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <h2 class="text-lg font-semibold text-slate-800"><?= e($pageTitle ?? 'Dashboard') ?></h2>
+                <h2 class="text-base sm:text-lg font-semibold text-slate-800 truncate"><?= e($pageTitle ?? 'Dashboard') ?></h2>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-shrink-0">
                 <?php if (!empty($switcherProjects)): ?>
                 <!-- Project Switcher -->
                 <div class="relative" id="projectSwitcher">
-                    <button onclick="toggleProjectMenu()" type="button" class="flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 max-w-[200px]">
+                    <button onclick="toggleProjectMenu()" type="button" class="flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 max-w-[150px] sm:max-w-[200px]">
                         <span class="w-2 h-2 rounded-full <?= ($activeProject['status'] ?? '') === 'active' ? 'bg-emerald-500' : 'bg-amber-400' ?>"></span>
                         <span class="truncate font-medium"><?= e($activeProject['business_name'] ?? 'Pilih Proyek') ?></span>
                         <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>

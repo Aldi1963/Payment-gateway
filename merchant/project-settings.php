@@ -108,31 +108,31 @@ if (is_post()) {
 
 $ipEmpty = trim($project['ip_whitelist'] ?? '') === '';
 
-$pageTitle = 'Pengaturan Proyek: ' . ($project['business_name'] ?? '');
+$pageTitle = 'Pengaturan Proyek';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/merchant_layout.php';
 ?>
 
 
 <!-- Breadcrumb -->
-<div class="flex items-center gap-2 text-sm text-slate-500 mb-4">
-    <a href="/merchant/projects.php" class="hover:text-slate-700">Proyek</a>
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-    <span class="text-slate-800 font-medium"><?= e($project['business_name']) ?></span>
+<div class="flex items-center gap-2 text-sm text-slate-500 mb-4 min-w-0">
+    <a href="/merchant/projects.php" class="hover:text-slate-700 flex-shrink-0">Proyek</a>
+    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    <span class="text-slate-800 font-medium truncate"><?= e($project['business_name']) ?></span>
 </div>
 
 <!-- Project Header -->
-<div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
+<div class="flex flex-wrap items-start justify-between gap-3 mb-6">
+    <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0">
             <?= strtoupper(substr($project['business_name'], 0, 1)) ?>
         </div>
-        <div>
-            <h3 class="text-lg font-semibold text-slate-800"><?= e($project['business_name']) ?></h3>
-            <p class="text-xs text-slate-500 font-mono"><?= e($project['slug'] ?? '') ?></p>
+        <div class="min-w-0">
+            <h3 class="text-lg font-semibold text-slate-800 break-words"><?= e($project['business_name']) ?></h3>
+            <p class="text-xs text-slate-500 font-mono break-all"><?= e($project['slug'] ?? '') ?></p>
         </div>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-shrink-0">
         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?= ($project['mode'] ?? 'sandbox') === 'production' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' ?>">
             <?= ucfirst($project['mode'] ?? 'sandbox') ?>
         </span>
