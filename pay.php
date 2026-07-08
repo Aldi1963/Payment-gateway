@@ -8,7 +8,7 @@
  * 3. Status Pages - PAID, EXPIRED, FAILED
  * 
  * URL: /pay.php?order_id=INV-XXXXX
- * Select: /pay.php?order_id=INV-XXXXX&select_method=midtrans_bca_va
+ * Select: /pay.php?order_id=INV-XXXXX&select_method=BCAVA
  */
 
 require_once __DIR__ . '/includes/init.php';
@@ -55,7 +55,6 @@ if ($transaction) {
         $txService = new TransactionService();
 
         // Determine channel from method code
-        // Simple codes: QRIS = aldiqris, everything else = midtrans
         $upperMethod = strtoupper($selectMethod);
         if ($upperMethod === 'QRIS') {
             $channel = 'qris';
@@ -185,12 +184,12 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
             'store' => ['label' => 'Convenience Store', 'methods' => []],
         ];
 
-        // Add AldiQRIS as QRIS option
+        // Add QRIS option
         if (isset($enabledChannels['qris'])) {
             $groups['qris']['methods'][] = [
                 'code' => 'QRIS',
-                'name' => 'QRIS (Semua Bank & E-Wallet)',
-                'desc' => 'GoPay, OVO, DANA, LinkAja, ShopeePay, dll',
+                'name' => 'QRIS',
+                'desc' => 'Scan QR dari semua e-wallet & mobile banking',
                 'fee' => 'Fee 0.7%',
                 'icon' => 'qris',
             ];
@@ -213,7 +212,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                     $groups['qris']['methods'][] = [
                         'code' => $code,
                         'name' => $m['name'],
-                        'desc' => 'Via Midtrans',
+                        'desc' => 'Scan QR dari semua e-wallet',
                         'fee' => 'Fee 0.7%',
                         'icon' => 'qris_mt',
                     ];

@@ -183,7 +183,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         <span class="px-3 py-1 rounded-lg text-xs font-bold font-mono bg-emerald-100 text-emerald-700">POST</span>
         <h2 class="text-2xl font-bold text-slate-900">Create Transaction</h2>
     </div>
-    <p class="text-slate-600 mb-4">Buat transaksi pembayaran baru. Pilih channel QRIS (default) atau Midtrans (VA, QRIS, GoPay, ShopeePay). Customer akan diarahkan ke halaman pembayaran branded Anda.</p>
+    <p class="text-slate-600 mb-4">Buat transaksi pembayaran baru. Customer akan diarahkan ke halaman checkout branded Anda untuk memilih metode pembayaran (QRIS, VA Bank, GoPay, ShopeePay).</p>
     
     <div class="bg-slate-900 rounded-xl overflow-hidden mb-6">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-800">
@@ -216,8 +216,8 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
     <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
         <p class="text-sm font-medium text-indigo-800 mb-2">Payment Channels:</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-indigo-700">
-            <div><strong>qris</strong> — QRIS semua bank & e-wallet (AldiQRIS)</div>
-            <div><strong>midtrans</strong> — VA Bank, GoPay, ShopeePay, QRIS</div>
+            <div><strong>qris</strong> — Scan QR dari semua bank & e-wallet</div>
+            <div><strong>bank_transfer</strong> — VA Bank, GoPay, ShopeePay</div>
         </div>
         <p class="text-xs text-indigo-600 mt-3 font-medium">Atau kosongkan payment_channel → customer pilih sendiri di halaman checkout.</p>
     </div>
@@ -228,14 +228,14 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         <table class="w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
             <thead><tr class="bg-slate-50"><th class="px-4 py-3 text-left font-semibold">Code</th><th class="px-4 py-3 text-left font-semibold">Metode</th><th class="px-4 py-3 text-left font-semibold">Tampilan di Checkout</th></tr></thead>
             <tbody class="divide-y divide-slate-100">
-                <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">QRIS</td><td class="px-4 py-3">QRIS (AldiQRIS)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code scan semua bank & e-wallet</td></tr>
+                <tr><td class="px-4 py-3 font-mono text-blue-600 text-xs">QRIS</td><td class="px-4 py-3">QRIS</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code scan semua bank & e-wallet</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BCAVA</td><td class="px-4 py-3">VA BCA</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BNIVA</td><td class="px-4 py-3">VA BNI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">BRIVA</td><td class="px-4 py-3">VA BRI</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">PERMATAVA</td><td class="px-4 py-3">VA Permata</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">CIMBVA</td><td class="px-4 py-3">VA CIMB Niaga</td><td class="px-4 py-3 text-slate-500 text-xs">Nomor VA + Copy</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">MANDIRI</td><td class="px-4 py-3">Mandiri Bill Payment</td><td class="px-4 py-3 text-slate-500 text-xs">Bill Key + Biller Code</td></tr>
-                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">MTQRIS</td><td class="px-4 py-3">QRIS (Midtrans)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code</td></tr>
+                <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">MTQRIS</td><td class="px-4 py-3">QRIS (Multi-Bank)</td><td class="px-4 py-3 text-slate-500 text-xs">QR Code</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">GOPAY</td><td class="px-4 py-3">GoPay</td><td class="px-4 py-3 text-slate-500 text-xs">QR + Deeplink</td></tr>
                 <tr class="bg-indigo-50/30"><td class="px-4 py-3 font-mono text-indigo-600 text-xs">SHOPEEPAY</td><td class="px-4 py-3">ShopeePay</td><td class="px-4 py-3 text-slate-500 text-xs">Deeplink ke app</td></tr>
             </tbody>
@@ -249,7 +249,7 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
             <li>Create transaction via API (tanpa <code class="bg-slate-200 px-1 rounded">payment_channel</code> = customer pilih sendiri)</li>
             <li>Redirect/arahkan customer ke <code class="bg-slate-200 px-1 rounded">payment_url</code> yang dikembalikan</li>
             <li>Customer melihat daftar metode pembayaran dan memilih salah satu</li>
-            <li>Sistem memanggil provider (AldiQRIS/Midtrans) dan menampilkan detail (VA/QR/deeplink)</li>
+            <li>Sistem memanggil provider (system) dan menampilkan detail (VA/QR/deeplink)</li>
             <li>Customer bayar → webhook masuk → status otomatis berubah ke PAID</li>
         </ol>
     </div>

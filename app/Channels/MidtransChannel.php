@@ -57,7 +57,7 @@ class MidtransChannel implements PaymentChannelInterface
             'CIMBVA' => ['name' => 'VA CIMB', 'setting' => 'cimb_va', 'icon' => 'cimb'],
             'GOPAY' => ['name' => 'GoPay', 'setting' => 'gopay', 'icon' => 'gopay'],
             'SHOPEEPAY' => ['name' => 'ShopeePay', 'setting' => 'shopeepay', 'icon' => 'shopeepay'],
-            'MTQRIS' => ['name' => 'QRIS (Midtrans)', 'setting' => 'qris', 'icon' => 'qris_mt'],
+            'MTQRIS' => ['name' => 'QRIS', 'setting' => 'qris', 'icon' => 'qris_mt'],
         ];
         foreach ($available as $code => $info) {
             if (setting("midtrans_{$info['setting']}_enabled", '1') === '1') {

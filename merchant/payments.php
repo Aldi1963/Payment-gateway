@@ -111,14 +111,14 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                     <label class="relative flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 transition-all">
                         <input type="radio" name="payment_channel" value="midtrans" <?= ($_POST['payment_channel'] ?? '') === 'midtrans' ? 'checked' : '' ?> class="w-4 h-4 text-indigo-600">
                         <div>
-                            <p class="text-sm font-medium text-slate-800">Midtrans</p>
-                            <p class="text-xs text-slate-500">VA, CC, GoPay, ShopeePay, dll</p>
+                            <p class="text-sm font-medium text-slate-800">Bank Transfer & E-Wallet</p>
+                            <p class="text-xs text-slate-500">VA, GoPay, ShopeePay, QRIS</p>
                         </div>
                     </label>
                     <?php endif; ?>
                 </div>
 
-                <!-- Midtrans Payment Method (shown when midtrans selected) -->
+                <!-- Payment Method (shown when bank_transfer selected) -->
                 <div id="midtransMethodSection" class="mt-3 hidden">
                     <label class="block text-xs text-slate-500 mb-1">Pilih Metode (opsional, kosong = tampilkan semua)</label>
                     <select name="payment_method" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">

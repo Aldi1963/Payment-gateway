@@ -28,7 +28,7 @@ $appUrl = setting('app_url', app_url(''));
 
     <?php
     $endpoints = [
-        ['method'=>'POST','path'=>'?action=create_transaction','title'=>'Create Transaction','desc'=>'Buat transaksi pembayaran baru (QRIS atau Midtrans VA/QRIS/e-wallet)','params'=>[
+        ['method'=>'POST','path'=>'?action=create_transaction','title'=>'Create Transaction','desc'=>'Buat transaksi pembayaran baru (QRIS, VA Bank, E-Wallet)','params'=>[
             ['name'=>'amount','type'=>'integer','required'=>true,'desc'=>'Jumlah pembayaran dalam Rupiah'],
             ['name'=>'order_id','type'=>'string','required'=>false,'desc'=>'Order ID unik (auto-generate jika kosong)'],
             ['name'=>'payment_channel','type'=>'string','required'=>false,'desc'=>'Channel: qris (default) atau midtrans'],
@@ -81,14 +81,14 @@ $appUrl = setting('app_url', app_url(''));
         <p class="text-sm text-slate-500 mb-4">Kosongkan <code class="bg-slate-200 px-1 rounded text-xs">payment_channel</code> agar customer memilih sendiri di halaman checkout, atau tentukan salah satu:</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left">Metode</th><th class="px-3 py-2 text-left">Tampilan</th></tr></thead><tbody>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS</td><td class="px-3 py-2 text-xs">QRIS (AldiQRIS)</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-blue-600">QRIS</td><td class="px-3 py-2 text-xs">QRIS</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BCAVA</td><td class="px-3 py-2 text-xs">VA BCA</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BNIVA</td><td class="px-3 py-2 text-xs">VA BNI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">BRIVA</td><td class="px-3 py-2 text-xs">VA BRI</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">PERMATAVA</td><td class="px-3 py-2 text-xs">VA Permata</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">CIMBVA</td><td class="px-3 py-2 text-xs">VA CIMB</td><td class="px-3 py-2 text-xs">Nomor VA</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MANDIRI</td><td class="px-3 py-2 text-xs">Mandiri Bill</td><td class="px-3 py-2 text-xs">Bill Key</td></tr>
-                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MTQRIS</td><td class="px-3 py-2 text-xs">QRIS (Midtrans)</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
+                <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">MTQRIS</td><td class="px-3 py-2 text-xs">QRIS (Multi-Bank)</td><td class="px-3 py-2 text-xs">QR Code</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">GOPAY</td><td class="px-3 py-2 text-xs">GoPay</td><td class="px-3 py-2 text-xs">QR + Deeplink</td></tr>
                 <tr class="border-t"><td class="px-3 py-2 font-mono text-xs text-indigo-600">SHOPEEPAY</td><td class="px-3 py-2 text-xs">ShopeePay</td><td class="px-3 py-2 text-xs">Deeplink</td></tr>
             </tbody></table>
