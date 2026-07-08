@@ -97,13 +97,14 @@ if ($user) {
         'updated_at' => now(),
     ]);
 
-    // Create user (no password - Google only)
-    $userRepo->create([
+    // Create user (no password - Google only) with account-level API key
+    $newUser = [
         'id' => $userId,
         'merchant_id' => $merchantId,
         'name' => $name,
         'email' => $email,
         'password_hash' => '', // No password for Google users
+        'api_key' => generate_api_key(),
         'role' => 'merchant',
         'status' => 'active',
         'email_verified' => 1,
@@ -112,7 +113,12 @@ if ($user) {
         'last_login_at' => now(),
         'created_at' => now(),
         'updated_at' => now(),
-    ]);
+    ];
+    require_once base_path('app/Schema.php');
+    if (!Schema::accountApiKeyReady()) {
+        unset($newUser['api_key']);
+    }
+    $userRepo->create($newUser);
 
     $user = $userRepo->find($userId);
     $auditService->log($userId, 'merchant', $merchantId, 'register_google', "New merchant registered via Google: {$email}", []);

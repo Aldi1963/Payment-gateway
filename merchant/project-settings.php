@@ -192,7 +192,22 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                 </div>
                 <p class="text-sm font-mono text-slate-700 break-all"><?= e($project['redirect_url'] ?: '(belum diatur)') ?></p>
             </div>
+            <!-- Webhook Signing Secret (per-project, for verifying webhook signatures) -->
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <label class="text-xs font-medium text-slate-500 block mb-1">Webhook Signing Secret</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="signingSecret" value="<?= e($project['api_key'] ?? '') ?>" readonly autocomplete="off" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded text-xs font-mono text-slate-700">
+                    <button type="button" onclick="copySigningSecret()" class="px-3 py-2 bg-slate-100 text-slate-700 rounded text-xs hover:bg-slate-200 whitespace-nowrap">Copy</button>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Dipakai untuk memverifikasi tanda tangan (<code class="font-mono">X-Signature</code>) webhook proyek ini. Berbeda dari API Key akun.</p>
+            </div>
         </div>
+        <script>
+        function copySigningSecret() {
+            var f = document.getElementById('signingSecret');
+            navigator.clipboard.writeText(f.value).then(function(){ if (typeof showToast === 'function') showToast('Signing secret disalin!'); });
+        }
+        </script>
 
         <!-- Change Webhook URL -->
         <?php if (!$hasPendingWebhook): ?>

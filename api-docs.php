@@ -22,7 +22,8 @@ $appUrl = setting('app_url', app_url(''));
     <div class="mb-10">
         <h1 class="text-3xl font-bold text-slate-800"><?= e($appName) ?> API</h1>
         <p class="text-slate-500 mt-2">REST API untuk integrasi pembayaran. Base URL: <code class="bg-slate-200 px-2 py-0.5 rounded text-sm font-mono"><?= e(rtrim($appUrl, '/')) ?>/api/index.php</code></p>
-        <p class="text-sm text-slate-400 mt-1">Authentication: <code class="text-blue-600">Authorization: Bearer YOUR_API_KEY</code></p>
+        <p class="text-sm text-slate-400 mt-1">Authentication: <code class="text-blue-600">Authorization: Bearer YOUR_ACCOUNT_API_KEY</code></p>
+        <p class="text-sm text-slate-400 mt-1">Target proyek: <code class="text-blue-600">X-Project-Id: PROJECT_ID</code> atau <code class="text-blue-600">X-Project: slug</code> (wajib jika akun punya &gt;1 proyek)</p>
     </div>
 
 
@@ -103,7 +104,7 @@ $appUrl = setting('app_url', app_url(''));
             <div>
                 <h4 class="text-xs font-semibold text-slate-500 uppercase mb-2">Headers</h4>
                 <pre class="bg-slate-100 rounded-lg p-3 text-xs font-mono">Content-Type: application/json
-X-Signature: HMAC-SHA256(body, your_api_key)</pre>
+X-Signature: HMAC-SHA256(body, webhook_signing_secret)</pre>
             </div>
             <div>
                 <h4 class="text-xs font-semibold text-slate-500 uppercase mb-2">Payload</h4>

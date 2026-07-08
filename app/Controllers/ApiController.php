@@ -29,6 +29,7 @@ require_once base_path('app/Services/PaginationService.php');
 class ApiController
 {
     private ?array $merchant = null;
+    private ?array $authUser = null; // set when authenticated via account-level key
     private RateLimiter $rateLimiter;
     private PaginationService $pagination;
 
@@ -83,9 +84,31 @@ class ApiController
             json_response(['error' => 'Unauthorized', 'message' => 'Invalid API key format'], 401);
         }
 
-        // Find merchant by API key (timing-safe)
+        require_once base_path('app/Schema.php');
         $merchantRepo = new MerchantRepository();
-        $this->merchant = $merchantRepo->findByApiKeySecure($apiKey);
+
+        // --- 1. Try ACCOUNT-level key (new model): one key for all projects ---
+        // Target project is selected per-request via X-Project-Id / X-Project
+        // header (or project_id / project query param).
+        if (Schema::accountApiKeyReady() && Schema::multiProjectReady()) {
+            require_once base_path('app/Repositories/UserRepository.php');
+            $userRepo = new UserRepository();
+            $user = $userRepo->findByApiKeySecure($apiKey);
+            if ($user) {
+                if (($user['status'] ?? '') !== 'active') {
+                    json_response(['error' => 'Forbidden', 'message' => 'Account is not active'], 403);
+                }
+                $this->authUser = $user;
+                // Resolves the target project and validates ownership.
+                // May emit 400/403/404 and exit if resolution fails.
+                $this->merchant = $this->resolveTargetProject($user);
+            }
+        }
+
+        // --- 2. Fall back to LEGACY per-merchant key (backward compatible) ---
+        if (!$this->merchant) {
+            $this->merchant = $merchantRepo->findByApiKeySecure($apiKey);
+        }
 
         if (!$this->merchant) {
             // Add extra delay on failed auth to prevent timing attacks
@@ -111,6 +134,59 @@ class ApiController
         }
 
         return true;
+    }
+
+    /**
+     * Resolve the target project (merchant) for an account-level API key.
+     *
+     * Selection order:
+     *   1. Explicit: X-Project-Id header / ?project_id  (merchant id)
+     *      or X-Project header / ?project  (slug)
+     *   2. Implicit: if the account has exactly ONE project, use it
+     *   3. Otherwise (multiple projects, none specified): 400 with guidance
+     *
+     * Ownership is always validated. Emits an error response and exits on failure.
+     *
+     * @return array The resolved merchant/project row.
+     */
+    private function resolveTargetProject(array $user): array
+    {
+        require_once base_path('app/Repositories/UserMerchantRepository.php');
+        $userMerchantRepo = new UserMerchantRepository();
+        $merchantRepo = new MerchantRepository();
+
+        $projectId = trim((string)($_SERVER['HTTP_X_PROJECT_ID'] ?? $_GET['project_id'] ?? ''));
+        $projectSlug = trim((string)($_SERVER['HTTP_X_PROJECT'] ?? $_GET['project'] ?? ''));
+
+        // 1. Explicit project selection
+        if ($projectId !== '' || $projectSlug !== '') {
+            $target = $projectId !== ''
+                ? $merchantRepo->find($projectId)
+                : $merchantRepo->findBySlug($projectSlug);
+
+            if (!$target) {
+                json_response(['error' => 'Not Found', 'message' => 'Specified project not found'], 404);
+            }
+            if (!$userMerchantRepo->userHasAccess($user['id'], $target['id'])) {
+                json_response(['error' => 'Forbidden', 'message' => 'You do not have access to the specified project'], 403);
+            }
+            return $target;
+        }
+
+        // 2. No project specified — resolve implicitly
+        $projects = $userMerchantRepo->getProjectsForUser($user['id']);
+        if (empty($projects)) {
+            json_response(['error' => 'Bad Request', 'message' => 'No project found for this account'], 400);
+        }
+        if (count($projects) === 1) {
+            return $projects[0];
+        }
+
+        // 3. Ambiguous — require explicit selection to avoid mis-routing payments
+        json_response([
+            'error' => 'Bad Request',
+            'message' => 'Multiple projects found for this account. Specify the target project via the X-Project-Id (project id) or X-Project (slug) header.',
+        ], 400);
     }
 
     /**

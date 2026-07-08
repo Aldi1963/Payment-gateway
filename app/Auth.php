@@ -206,18 +206,24 @@ class Auth
         ];
         $merchantRepo->create($merchant);
         
-        // Create user
+        // Create user (with account-level API key for all their projects)
         $user = [
             'id' => $userId,
             'merchant_id' => $merchantId,
             'name' => $data['name'],
             'email' => $data['email'],
             'password_hash' => password_hash($data['password'], PASSWORD_DEFAULT),
+            'api_key' => generate_api_key(),
             'role' => 'merchant',
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
         ];
+        // Only include api_key if the schema supports it (graceful pre-migration)
+        require_once base_path('app/Schema.php');
+        if (!Schema::accountApiKeyReady()) {
+            unset($user['api_key']);
+        }
         $userRepo->create($user);
 
         // Link user to merchant via pivot (first project = default)

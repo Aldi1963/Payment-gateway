@@ -193,12 +193,14 @@ switch ($action) {
                     'GET  /api/health.php' => 'System health check (no auth required)',
                 ],
             ],
-            'auth' => 'Bearer YOUR_API_KEY',
+            'auth' => 'Bearer YOUR_ACCOUNT_API_KEY (one key for all projects)',
             'headers' => [
-                'Authorization' => 'Bearer <api_key> (required)',
+                'Authorization' => 'Bearer <account_api_key> (required)',
+                'X-Project-Id' => '<project_id> (required when account has >1 project; or use X-Project: <slug>)',
                 'Content-Type' => 'application/json (for POST requests)',
                 'Idempotency-Key' => '<unique-key> (optional, for POST requests)',
             ],
+            'note' => 'Legacy per-project API keys remain valid; with a legacy key the project is inferred and X-Project-Id is not needed. Webhook signature (X-Signature) uses the per-project Webhook Signing Secret.',
             'pagination' => [
                 'page' => 'Page number (default: 1)',
                 'per_page' => 'Items per page (default: 20, max: 100)',

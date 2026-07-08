@@ -119,16 +119,24 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
         <span class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center"><svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg></span>
         Authentication
     </h2>
-    <p class="text-slate-600 mb-4">Semua request API memerlukan header <code class="bg-slate-100 px-2 py-0.5 rounded text-sm font-mono text-blue-600">Authorization</code> dengan Bearer token.</p>
+    <p class="text-slate-600 mb-4">API memakai <strong>satu API key per akun</strong> (berlaku untuk semua proyek). Kirim sebagai Bearer token pada header <code class="bg-slate-100 px-2 py-0.5 rounded text-sm font-mono text-blue-600">Authorization</code>.</p>
     <div class="bg-slate-900 rounded-xl overflow-hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-800">
             <span class="text-xs text-slate-400 font-mono">Header</span>
             <button onclick="copyCode(this)" class="copy-btn text-xs text-slate-400 hover:text-white transition-colors">Copy</button>
         </div>
-        <pre class="p-4 text-sm"><code class="text-emerald-300">Authorization: Bearer <span class="text-amber-300">YOUR_API_KEY</span></code></pre>
+        <pre class="p-4 text-sm"><code class="text-emerald-300">Authorization: Bearer <span class="text-amber-300">YOUR_ACCOUNT_API_KEY</span>
+X-Project-Id: <span class="text-amber-300">TARGET_PROJECT_ID</span></code></pre>
+    </div>
+    <div class="mt-4 bg-slate-100 rounded-xl p-4 text-sm text-slate-600">
+        <p class="mb-1"><strong>Memilih proyek:</strong> karena satu key dipakai untuk banyak proyek, sertakan proyek tujuan lewat header <code class="font-mono text-blue-600">X-Project-Id</code> (ID) atau <code class="font-mono text-blue-600">X-Project</code> (slug).</p>
+        <p class="text-xs text-slate-500">Jika akun hanya punya 1 proyek, header opsional. Jika &gt;1 proyek dan tidak disertakan, request ditolak <code class="font-mono">400</code>.</p>
     </div>
     <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p class="text-sm text-amber-800"><strong>Penting:</strong> API Key bisa ditemukan di Dashboard Merchant setelah akun diaktifkan oleh admin. Jaga kerahasiaan API Key Anda.</p>
+        <p class="text-sm text-amber-800"><strong>Penting:</strong> API Key akun ada di <strong>Pengaturan &rsaquo; API Key</strong>. Jaga kerahasiaannya. Untuk verifikasi tanda tangan webhook, gunakan <strong>Webhook Signing Secret</strong> per-proyek (Project Settings), bukan API key akun.</p>
+    </div>
+    <div class="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-500">
+        <strong>Kompatibilitas:</strong> API key lama per-proyek tetap berlaku. Untuk key lama, proyek ditentukan otomatis dari key dan header <code class="font-mono">X-Project-Id</code> tidak diperlukan.
     </div>
 </section>
 
@@ -435,8 +443,8 @@ $baseApi = rtrim($appUrl, '/') . '/api/index.php';
 $payload = file_get_contents('php://input');
 $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
 
-<span class="text-slate-500">// Hitung signature dengan API key Anda</span>
-$expected = hash_hmac('sha256', $payload, <span class="text-amber-300">$yourApiKey</span>);
+<span class="text-slate-500">// Hitung signature dengan Webhook Signing Secret proyek (Project Settings)</span>
+$expected = hash_hmac('sha256', $payload, <span class="text-amber-300">$webhookSigningSecret</span>);
 
 <span class="text-slate-500">// Bandingkan (timing-safe)</span>
 if (!hash_equals($expected, $signature)) {

@@ -264,7 +264,7 @@ class MerchantController
     }
 
     /**
-     * Regenerate API key
+     * Regenerate API key (legacy, per-project)
      */
     public function regenerateApiKey(): array
     {
@@ -277,6 +277,49 @@ class MerchantController
         );
 
         return ['success' => true, 'message' => 'API key berhasil dibuat ulang.', 'api_key' => $newKey];
+    }
+
+    /**
+     * Get the account-level API key (one key for all projects).
+     * Auto-generates one for owners that don't have it yet (post-migration safety).
+     */
+    public function getAccountApiKey(): ?string
+    {
+        require_once base_path('app/Repositories/UserRepository.php');
+        require_once base_path('app/Schema.php');
+        if (!Schema::accountApiKeyReady()) {
+            return null;
+        }
+        $userRepo = new UserRepository();
+        $user = $userRepo->find(Auth::id());
+        // Owners without a key yet (e.g. pre-existing account) get one generated.
+        if (empty($user['api_key']) && Auth::role() === 'merchant') {
+            return $userRepo->regenerateApiKey(Auth::id());
+        }
+        return $user['api_key'] ?? null;
+    }
+
+    /**
+     * Regenerate the account-level API key.
+     * Direct action (password-confirmed by caller) — it is the account owner's
+     * own credential, similar to changing a password.
+     */
+    public function regenerateAccountApiKey(): array
+    {
+        require_once base_path('app/Repositories/UserRepository.php');
+        require_once base_path('app/Schema.php');
+        if (!Schema::accountApiKeyReady()) {
+            return ['success' => false, 'message' => 'Fitur API key akun belum tersedia. Jalankan migrasi database.'];
+        }
+        $userRepo = new UserRepository();
+        $newKey = $userRepo->regenerateApiKey(Auth::id());
+
+        $this->auditService->log(
+            Auth::id(), Auth::role(), Auth::merchantId(),
+            'account_api_key_regenerated', 'Account API key regenerated', []
+        );
+
+        return ['success' => true, 'message' => 'API key akun berhasil dibuat ulang. Perbarui integrasi Anda.', 'api_key' => $newKey];
     }
 
     /**

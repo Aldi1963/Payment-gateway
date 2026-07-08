@@ -132,8 +132,13 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
                 <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono"><?= e(app_url('api/v1/')) ?></code>
             </div>
             <div>
-                <span class="text-xs text-slate-500">Authentication:</span>
-                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">Authorization: Bearer YOUR_API_KEY</code>
+                <span class="text-xs text-slate-500">Authentication (API key akun, 1 untuk semua proyek):</span>
+                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">Authorization: Bearer YOUR_ACCOUNT_API_KEY</code>
+            </div>
+            <div>
+                <span class="text-xs text-slate-500">Proyek tujuan (wajib jika akun punya &gt;1 proyek):</span>
+                <code class="block mt-1 px-3 py-2 bg-slate-100 rounded text-xs font-mono">X-Project-Id: <?= e($merchantId) ?></code>
+                <p class="text-xs text-slate-400 mt-1">Alternatif: <code class="font-mono">X-Project: &lt;slug&gt;</code>. Ambil API key di <a href="/merchant/settings.php?tab=apikey" class="text-blue-600 hover:underline">Pengaturan &rsaquo; API Key</a>.</p>
             </div>
             <div>
                 <span class="text-xs text-slate-500">Content-Type:</span>
@@ -211,7 +216,8 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
         <h4 class="text-sm font-semibold text-slate-800 mb-3">Contoh cURL</h4>
         <div class="relative">
             <pre id="curlExample" class="text-xs font-mono bg-slate-900 text-emerald-300 rounded-lg p-4 overflow-x-auto">curl -X POST <?= e(app_url('api/v1/transactions')) ?> \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_ACCOUNT_API_KEY" \
+  -H "X-Project-Id: <?= e($merchantId) ?>" \
   -H "Content-Type: application/json" \
   -d '{
     "order_id": "INV-001",
@@ -318,7 +324,7 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
     <!-- Signature Verification -->
     <div class="bg-white rounded-xl border border-slate-200 p-6">
         <h4 class="text-sm font-semibold text-slate-800 mb-3">Validasi Signature</h4>
-        <p class="text-sm text-slate-600 mb-4">Setiap webhook membawa header <code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">X-Signature</code> berisi HMAC-SHA256 dari body menggunakan API Key Anda sebagai secret.</p>
+        <p class="text-sm text-slate-600 mb-4">Setiap webhook membawa header <code class="text-xs px-1.5 py-0.5 bg-slate-100 rounded">X-Signature</code> berisi HMAC-SHA256 dari body menggunakan <strong>Webhook Signing Secret</strong> proyek sebagai secret (bukan API key akun). Ambil di <a href="/merchant/project-settings.php?id=<?= e($merchantId) ?>" class="text-blue-600 hover:underline">Project Settings</a>.</p>
 
         <div class="mb-4">
             <p class="text-xs font-medium text-slate-500 mb-2">Headers yang dikirim:</p>
@@ -333,8 +339,8 @@ User-Agent: ClipkuPay-Webhook/1.0</pre>
 $payload = file_get_contents('php://input');
 $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
 
-// 2. Hitung HMAC dengan API key Anda
-$calculated = hash_hmac('sha256', $payload, $yourApiKey);
+// 2. Hitung HMAC dengan Webhook Signing Secret proyek (dari Project Settings)
+$calculated = hash_hmac('sha256', $payload, $webhookSigningSecret);
 
 // 3. Bandingkan (timing-safe)
 if (!hash_equals($calculated, $signature)) {
@@ -355,7 +361,7 @@ app.post('/webhook', (req, res) => {
   const payload = JSON.stringify(req.body);
   const signature = req.headers['x-signature'];
   const calculated = crypto
-    .createHmac('sha256', YOUR_API_KEY)
+    .createHmac('sha256', WEBHOOK_SIGNING_SECRET)
     .update(payload)
     .digest('hex');
 

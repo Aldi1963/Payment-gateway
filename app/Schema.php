@@ -109,6 +109,15 @@ class Schema
     }
 
     /**
+     * Is the account-level API key feature present?
+     * Requires the users.api_key column.
+     */
+    public static function accountApiKeyReady(): bool
+    {
+        return self::hasColumn('users', 'api_key');
+    }
+
+    /**
      * Return a list of missing pieces for the multi-project schema (for diagnostics).
      */
     public static function multiProjectMissing(): array
