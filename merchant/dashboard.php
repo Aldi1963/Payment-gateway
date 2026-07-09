@@ -133,8 +133,8 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 </div>
 
 <?php
-// Chart data - last 7 days (use ALL transactions from the controller, not just recent)
-$allTxForChart = $controller->transactions([]);
+// Chart data - last 7 days (ALL transactions across ALL projects)
+$allTxForChart = $controller->allTransactions([]);
 $mChartDays = []; $mChartRev = []; $mChartCount = [];
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));

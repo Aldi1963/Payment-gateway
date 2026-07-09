@@ -173,22 +173,93 @@ class MerchantController
     }
 
     /**
-     * Dashboard data
+     * Dashboard data — GLOBAL (all projects owned by the user)
      */
     public function dashboard(): array
     {
-        $merchantId = Auth::merchantId();
-        $merchant = $this->merchantRepo->find($merchantId);
-        $stats = $this->transactionService->getMerchantStats($merchantId);
-        $wallet = $this->walletService->getByMerchant($merchantId);
-        $recentTx = (new \TransactionRepository())->getRecent(5, $merchantId);
+        $userId = Auth::id();
+        $projects = $this->projectService->listByUser($userId);
+        $merchantIds = array_column($projects, 'id');
+
+        // If user has no projects yet, fall back to active merchant
+        if (empty($merchantIds)) {
+            $merchantIds = [Auth::merchantId()];
+        }
+
+        // Aggregate stats across all projects
+        $stats = [
+            'total_transactions' => 0,
+            'total_revenue' => 0,
+            'today_transactions' => 0,
+            'today_revenue' => 0,
+            'month_transactions' => 0,
+            'month_revenue' => 0,
+            'pending_count' => 0,
+            'paid_count' => 0,
+            'failed_count' => 0,
+            'expired_count' => 0,
+        ];
+
+        foreach ($merchantIds as $mid) {
+            $mStats = $this->transactionService->getMerchantStats($mid);
+            foreach ($stats as $key => &$val) {
+                $val += $mStats[$key] ?? 0;
+            }
+            unset($val);
+        }
+
+        // Aggregate wallet balances across all projects
+        $wallet = ['available_balance' => 0, 'hold_balance' => 0];
+        foreach ($merchantIds as $mid) {
+            $w = $this->walletService->getByMerchant($mid);
+            if ($w) {
+                $wallet['available_balance'] += (int)($w['available_balance'] ?? 0);
+                $wallet['hold_balance'] += (int)($w['hold_balance'] ?? 0);
+            }
+        }
+
+        // Get recent transactions from ALL projects (merged & sorted)
+        $allRecentTx = [];
+        foreach ($merchantIds as $mid) {
+            $recent = (new \TransactionRepository())->getRecent(10, $mid);
+            $allRecentTx = array_merge($allRecentTx, $recent);
+        }
+        // Sort by created_at DESC and take top 10
+        usort($allRecentTx, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
+        $allRecentTx = array_slice($allRecentTx, 0, 10);
+
+        // Use active merchant for status display
+        $merchant = $this->merchantRepo->find(Auth::merchantId());
 
         return [
             'merchant' => $merchant,
             'stats' => $stats,
             'wallet' => $wallet,
-            'recent_transactions' => $recentTx,
+            'recent_transactions' => $allRecentTx,
+            'project_count' => count($merchantIds),
         ];
+    }
+
+    /**
+     * Get ALL transactions across all projects (for charts etc.)
+     */
+    public function allTransactions(array $filters = []): array
+    {
+        $userId = Auth::id();
+        $projects = $this->projectService->listByUser($userId);
+        $merchantIds = array_column($projects, 'id');
+
+        if (empty($merchantIds)) {
+            $merchantIds = [Auth::merchantId()];
+        }
+
+        $all = [];
+        foreach ($merchantIds as $mid) {
+            $txs = $this->transactionService->getByMerchant($mid, $filters);
+            $all = array_merge($all, $txs);
+        }
+        usort($all, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
+        return $all;
     }
 
     /**
