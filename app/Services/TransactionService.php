@@ -268,8 +268,28 @@ class TransactionService
         $webhookUrl = $transaction['webhook_url'] ?: app_url('webhook.php');
         $redirectUrl = $transaction['redirect_url'] ?: app_url('pay.php?order_id=' . urlencode($orderId) . '&status=success');
 
+        // For Midtrans: use a provider-specific order_id to avoid 406 conflict
+        // when retrying after a failed attempt. Format: {order_id}-{attempt}
+        // Our internal order_id stays the same for webhook matching.
+        $providerOrderId = $orderId;
+        if ($channelCode === 'midtrans') {
+            // Determine attempt number from previous api_response (if it had a 406)
+            $prevResponse = json_decode($transaction['api_response'] ?? '', true) ?: [];
+            $prevStatusCode = (int)($prevResponse['status_code'] ?? 0);
+            // Extract previous attempt from note field (format: "mt_attempt:N")
+            $attempt = 1;
+            if (preg_match('/mt_attempt:(\d+)/', $transaction['note'] ?? '', $am)) {
+                $attempt = (int)$am[1] + 1;
+            } elseif ($prevStatusCode === 406 || !empty($transaction['api_response'])) {
+                $attempt = 2; // at least one previous try happened
+            }
+            if ($attempt > 1) {
+                $providerOrderId = $orderId . '-' . $attempt;
+            }
+        }
+
         $channelPayload = [
-            'order_id' => $orderId,
+            'order_id' => $providerOrderId,
             'amount' => (int)$transaction['amount'],
             'link_name' => $transaction['link_name'] ?? '',
             'webhook_url' => $webhookUrl,
@@ -288,6 +308,29 @@ class TransactionService
         // Call provider
         $apiResult = $channel->createPayment($channelPayload);
 
+        // If Midtrans returns 406 (duplicate order_id), retry with incremented attempt
+        if (!$apiResult['success'] && $channelCode === 'midtrans') {
+            $rawResp = $apiResult['raw_response'] ?? '';
+            $respData = json_decode($rawResp, true) ?: [];
+            $statusCode = (int)($respData['status_code'] ?? 0);
+            if ($statusCode === 406 || str_contains($apiResult['error'] ?? '', 'conflict')) {
+                // Increment attempt and retry with new provider order_id
+                $attempt = (int)($transaction['payment_attempt'] ?? 0) + 1;
+                $maxAttempts = 5;
+                while (!$apiResult['success'] && $attempt <= $maxAttempts) {
+                    $attempt++;
+                    $providerOrderId = $orderId . '-' . $attempt;
+                    $channelPayload['order_id'] = $providerOrderId;
+                    $apiResult = $channel->createPayment($channelPayload);
+                    $respData = json_decode($apiResult['raw_response'] ?? '', true) ?: [];
+                    $statusCode = (int)($respData['status_code'] ?? 0);
+                    if ($statusCode !== 406 && !str_contains($apiResult['error'] ?? '', 'conflict')) {
+                        break;
+                    }
+                }
+            }
+        }
+
         // Update transaction
         $updates = [
             'payment_channel' => $channelCode,
@@ -296,6 +339,18 @@ class TransactionService
             'api_response' => $apiResult['raw_response'] ?? json_encode($apiResult),
             'updated_at' => now(),
         ];
+
+        // Track the attempt number for future retries (stored in note field)
+        if ($channelCode === 'midtrans' && isset($attempt) && $attempt > 1) {
+            $existingNote = $transaction['note'] ?? '';
+            // Replace or append mt_attempt marker
+            if (preg_match('/mt_attempt:\d+/', $existingNote)) {
+                $existingNote = preg_replace('/mt_attempt:\d+/', "mt_attempt:{$attempt}", $existingNote);
+            } else {
+                $existingNote = trim($existingNote . " | mt_attempt:{$attempt}", ' |');
+            }
+            $updates['note'] = $existingNote;
+        }
 
         // Recompute the fee now that the channel/method is known:
         // per-channel platform fee (+ Midtrans provider fee for Midtrans methods).

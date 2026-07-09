@@ -140,8 +140,12 @@ class WebhookService
             return ['success' => false, 'message' => 'Missing order_id', 'code' => 400];
         }
 
-        // Find transaction
+        // Find transaction — Midtrans may send the suffixed order_id (e.g. "INV-123-2")
+        // when we retried due to 406 conflict. Try exact match first, then strip suffix.
         $transaction = $this->transactionService->findByOrderId($orderId);
+        if (!$transaction && preg_match('/^(.+)-\d+$/', $orderId, $m)) {
+            $transaction = $this->transactionService->findByOrderId($m[1]);
+        }
         if (!$transaction) {
             $this->logEvent('invalid', null, $rawPayload, "Midtrans: Transaction not found for order_id: {$orderId}");
             return ['success' => false, 'message' => 'Transaction not found', 'code' => 404];
@@ -168,6 +172,8 @@ class WebhookService
         }
 
         // Midtrans signature formula: SHA512(order_id + status_code + gross_amount + server_key)
+        // NOTE: use the order_id from Midtrans payload (may include our retry suffix),
+        // NOT our internal order_id — Midtrans signed with what they received.
         $statusCode = $data['status_code'] ?? '';
         $grossAmount = $data['gross_amount'] ?? '';
         $calculatedSignature = hash('sha512', $orderId . $statusCode . $grossAmount . $serverKey);
