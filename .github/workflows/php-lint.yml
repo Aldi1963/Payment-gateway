@@ -1,0 +1,40 @@
+name: PHP Lint
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Lint all PHP files (php -l)
+        run: |
+          set -e
+          echo "Running php -l on all .php files..."
+          error=0
+          while IFS= read -r -d '' file; do
+            if ! php -l "$file" > /dev/null 2>&1; then
+              echo "Syntax error in: $file"
+              php -l "$file" || true
+              error=1
+            fi
+          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+          if [ "$error" -ne 0 ]; then
+            echo "PHP lint failed."
+            exit 1
+          fi
+          echo "All PHP files passed php -l."
