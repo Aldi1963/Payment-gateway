@@ -333,187 +333,95 @@ require_once __DIR__ . '/../includes/admin_layout.php';
 
 
 <?php elseif ($activeTab === 'fees'): ?>
-<!-- FEE & TRANSACTION SETTINGS -->
-<h3 class="text-lg font-semibold text-slate-800 mb-2">Pengaturan Fee & Transaksi</h3>
-<p class="text-sm text-slate-500 mb-6">Default fee untuk merchant baru dan limit transaksi global.</p>
+<!-- FEE & TRANSACTION SETTINGS — Simplified -->
+<h3 class="text-base font-semibold text-slate-800 mb-1">Fee & Transaksi</h3>
+<p class="text-xs text-slate-500 mb-5">Atur biaya layanan dan limit transaksi.</p>
 <form method="POST" class="space-y-5">
     <?= csrf_field() ?>
     <input type="hidden" name="_tab" value="fees">
-    <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-        <p class="text-sm text-blue-800 font-medium">Default Fee (fallback)</p>
-        <p class="text-xs text-blue-600">Dipakai hanya bila sebuah channel di bawah tidak punya biaya sendiri. Biaya layanan utama diatur per channel (QRIS/VA/E-Wallet).</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Tipe Fee</label>
-            <select name="default_fee_type" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">
-                <option value="percentage" <?= ($s['default_fee_type'] ?? 'percentage') === 'percentage' ? 'selected' : '' ?>>Percentage (%)</option>
-                <option value="flat" <?= ($s['default_fee_type'] ?? '') === 'flat' ? 'selected' : '' ?>>Flat (Rp)</option>
-                <option value="hybrid" <?= ($s['default_fee_type'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid (% + Rp)</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Fee Value</label>
-            <input type="number" name="default_fee_value" step="0.01" value="<?= e($s['default_fee_value'] ?? 0.7) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            <p class="text-xs text-slate-400 mt-1">% atau Rp tergantung tipe</p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Flat Add-on (hybrid)</label>
-            <input type="number" name="default_fee_flat" value="<?= e($s['default_fee_flat'] ?? 0) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-        </div>
-    </div>
 
-    <!-- Biaya layanan per channel (biaya admin) -->
-    <div class="border-t border-slate-200 pt-4">
-        <p class="text-sm font-medium text-slate-700 mb-1">Biaya Layanan per Channel (Biaya Admin)</p>
-        <p class="text-xs text-slate-500 mb-3">Biaya layanan yang dipotong dari merchant, diatur <strong>terpisah</strong> untuk QRIS, Virtual Account, dan E-Wallet. Untuk metode via Midtrans, biaya ini <strong>ditambah</strong> biaya provider Midtrans pada tabel di bawah. Pilih tipe "—" agar channel memakai Default Fee.</p>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm border border-slate-200 rounded-lg">
-                <thead class="bg-slate-50 text-slate-600">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-medium">Channel</th>
-                        <th class="px-3 py-2 text-left font-medium">Tipe</th>
-                        <th class="px-3 py-2 text-left font-medium">Value (% / Rp)</th>
-                        <th class="px-3 py-2 text-left font-medium">Flat Add-on (hybrid)</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <?php
-                    $feeChannels = ['qris' => 'QRIS', 'va' => 'Virtual Account', 'ewallet' => 'E-Wallet'];
-                    foreach ($feeChannels as $grp => $label):
-                        $ctype = $s["fee_{$grp}_type"] ?? '';
-                        $cval  = $s["fee_{$grp}_value"] ?? '';
-                        $cflat = $s["fee_{$grp}_flat"] ?? '';
-                    ?>
-                    <tr>
-                        <td class="px-3 py-2 font-medium text-slate-700 whitespace-nowrap"><?= e($label) ?></td>
-                        <td class="px-2 py-1.5">
-                            <select name="fee_<?= $grp ?>_type" class="px-2 py-1.5 border border-slate-300 rounded text-sm">
-                                <option value="" <?= $ctype === '' ? 'selected' : '' ?>>— (Default Fee)</option>
-                                <option value="percentage" <?= $ctype === 'percentage' ? 'selected' : '' ?>>Percentage (%)</option>
-                                <option value="flat" <?= $ctype === 'flat' ? 'selected' : '' ?>>Flat (Rp)</option>
-                                <option value="hybrid" <?= $ctype === 'hybrid' ? 'selected' : '' ?>>Hybrid (% + Rp)</option>
-                            </select>
-                        </td>
-                        <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" name="fee_<?= $grp ?>_value" value="<?= e($cval) ?>" placeholder="0" class="w-28 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
-                        <td class="px-2 py-1.5"><input type="number" step="1" min="0" name="fee_<?= $grp ?>_flat" value="<?= e($cflat) ?>" placeholder="0" class="w-28 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <p class="text-xs text-slate-400 mt-2">Value = % (tipe percentage/hybrid) atau Rp (tipe flat). Flat Add-on hanya dipakai tipe hybrid.</p>
-    </div>
-
-    <div class="border-t border-slate-200 pt-4">
-        <p class="text-sm font-medium text-slate-700 mb-3">Limit Transaksi</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs text-slate-500 mb-1">Minimum Transaksi (Rp)</label>
-                <input type="number" name="min_transaction_amount" value="<?= e($s['min_transaction_amount'] ?? 1000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
-            </div>
-            <div>
-                <label class="block text-xs text-slate-500 mb-1">Maksimum Transaksi (Rp)</label>
-                <input type="number" name="max_transaction_amount" value="<?= e($s['max_transaction_amount'] ?? 50000000) ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm">
+    <!-- 1. Biaya Layanan per Channel -->
+    <div>
+        <p class="text-sm font-semibold text-slate-700 mb-2">Biaya Layanan per Channel</p>
+        <p class="text-[11px] text-slate-500 mb-3">Fee dipotong dari merchant. Pilih "—" untuk gunakan Default.</p>
+        <?php
+        $feeChannels = ['qris' => ['QRIS','AldiQRIS'], 'va' => ['Virtual Account','Midtrans VA'], 'ewallet' => ['E-Wallet','GoPay/ShopeePay']];
+        foreach ($feeChannels as $grp => [$label, $desc]):
+            $ctype = $s["fee_{$grp}_type"] ?? '';
+            $cval  = $s["fee_{$grp}_value"] ?? '';
+            $cflat = $s["fee_{$grp}_flat"] ?? '';
+        ?>
+        <div class="p-3 mb-2 bg-slate-50 rounded-lg border border-slate-100">
+            <p class="text-xs font-medium text-slate-800 mb-0.5"><?= $label ?> <span class="text-slate-400 font-normal">(<?= $desc ?>)</span></p>
+            <div class="grid grid-cols-3 gap-2 mt-2">
+                <select name="fee_<?= $grp ?>_type" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]">
+                    <option value="" <?= $ctype === '' ? 'selected' : '' ?>>— Default</option>
+                    <option value="percentage" <?= $ctype === 'percentage' ? 'selected' : '' ?>>%</option>
+                    <option value="flat" <?= $ctype === 'flat' ? 'selected' : '' ?>>Rp</option>
+                    <option value="hybrid" <?= $ctype === 'hybrid' ? 'selected' : '' ?>>% + Rp</option>
+                </select>
+                <input type="number" step="0.01" min="0" name="fee_<?= $grp ?>_value" value="<?= e($cval) ?>" placeholder="Nilai" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]">
+                <input type="number" step="1" min="0" name="fee_<?= $grp ?>_flat" value="<?= e($cflat) ?>" placeholder="Flat" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]">
             </div>
         </div>
+        <?php endforeach; ?>
     </div>
 
-    <!-- Biaya provider Midtrans per metode -->
-    <div class="border-t border-slate-200 pt-4">
-        <p class="text-sm font-medium text-slate-700 mb-1">Biaya Provider Midtrans per Metode</p>
-        <p class="text-xs text-slate-500 mb-3">Biaya yang dikenakan Midtrans ke kita per metode (mis. VA Rp4.000). Nilai ini <strong>ditambahkan</strong> ke Biaya Layanan channel di atas untuk transaksi via Midtrans. Contoh VA: provider Rp4.000 + layanan channel VA Rp500 = <strong>Rp4.500</strong>. Kosongkan (0) bila tidak ada biaya provider.</p>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm border border-slate-200 rounded-lg">
-                <thead class="bg-slate-50 text-slate-600">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-medium">Metode</th>
-                        <th class="px-3 py-2 text-left font-medium">Midtrans Rp</th>
-                        <th class="px-3 py-2 text-left font-medium">Midtrans %</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <?php
-                    $mtFeeRows = [
-                        'bca_va' => ['VA BCA', 4000],
-                        'bni_va' => ['VA BNI', 4000],
-                        'bri_va' => ['VA BRI', 4000],
-                        'permata_va' => ['VA Permata', 4000],
-                        'cimb_va' => ['VA CIMB', 4000],
-                        'mandiri_bill' => ['Mandiri Bill', 4000],
-                        'gopay' => ['GoPay', 0],
-                        'shopeepay' => ['ShopeePay', 0],
-                        'qris' => ['QRIS (Midtrans)', 0],
-                    ];
-                    foreach ($mtFeeRows as $mm => $info):
-                        [$label, $phFlat] = $info;
-                    ?>
-                    <tr>
-                        <td class="px-3 py-2 font-medium text-slate-700 whitespace-nowrap"><?= e($label) ?></td>
-                        <td class="px-2 py-1.5"><input type="number" step="1" min="0" name="mtfee_<?= $mm ?>_prov_flat" value="<?= e($s["mtfee_{$mm}_prov_flat"] ?? '') ?>" placeholder="<?= $phFlat ?>" class="w-28 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
-                        <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" name="mtfee_<?= $mm ?>_prov_pct" value="<?= e($s["mtfee_{$mm}_prov_pct"] ?? '') ?>" placeholder="0" class="w-24 px-2 py-1.5 border border-slate-300 rounded text-sm"></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <p class="text-xs text-slate-400 mt-2">QRIS AldiQRIS (provider utama, bukan Midtrans) tidak dikenakan biaya provider ini — hanya Biaya Layanan channel QRIS.</p>
+    <!-- 2. Limit -->
+    <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-600 font-medium block mb-1">Min (Rp)</label>
+            <input type="number" name="min_transaction_amount" value="<?= e($s['min_transaction_amount'] ?? 1000) ?>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-slate-600 font-medium block mb-1">Max (Rp)</label>
+            <input type="number" name="max_transaction_amount" value="<?= e($s['max_transaction_amount'] ?? 50000000) ?>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></div>
     </div>
 
-    <!-- Fee simulator (client-side) -->
-    <div class="border-t border-slate-200 pt-4">
-        <p class="text-sm font-medium text-slate-700 mb-2">Simulasi Biaya</p>
-        <div class="flex flex-wrap items-end gap-2 mb-3">
-            <div>
-                <label class="block text-xs text-slate-500 mb-1">Nominal transaksi (Rp)</label>
-                <input type="number" id="feeSimAmount" value="100000" min="0" class="w-44 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <!-- 3. Default Fee — collapsed -->
+    <details class="border border-slate-200 rounded-lg"><summary class="px-3 py-2.5 cursor-pointer text-xs font-medium text-slate-600 hover:bg-slate-50">Default Fee (Fallback) ▾</summary>
+        <div class="px-3 pb-3 pt-2 border-t border-slate-100">
+            <p class="text-[11px] text-slate-400 mb-2">Dipakai bila channel di atas = "—".</p>
+            <div class="grid grid-cols-3 gap-2">
+                <select name="default_fee_type" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]">
+                    <option value="percentage" <?= ($s['default_fee_type'] ?? 'percentage') === 'percentage' ? 'selected' : '' ?>>%</option>
+                    <option value="flat" <?= ($s['default_fee_type'] ?? '') === 'flat' ? 'selected' : '' ?>>Rp</option>
+                    <option value="hybrid" <?= ($s['default_fee_type'] ?? '') === 'hybrid' ? 'selected' : '' ?>>% + Rp</option>
+                </select>
+                <input type="number" name="default_fee_value" step="0.01" value="<?= e($s['default_fee_value'] ?? 0.7) ?>" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]" placeholder="Value">
+                <input type="number" name="default_fee_flat" value="<?= e($s['default_fee_flat'] ?? 0) ?>" class="px-2 py-1.5 border border-slate-300 rounded text-[11px]" placeholder="Flat">
             </div>
-            <button type="button" onclick="runFeeSim()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700">Hitung</button>
         </div>
-        <div id="feeSimResult" class="text-sm border border-slate-200 rounded-lg divide-y divide-slate-100 hidden"></div>
-        <p class="text-xs text-slate-400 mt-2">Total = Biaya Layanan channel + Biaya Provider Midtrans. Menghitung dari nilai pada tabel di atas (tidak perlu disimpan dulu).</p>
+    </details>
+
+    <!-- 4. Provider Midtrans — collapsed -->
+    <details class="border border-slate-200 rounded-lg"><summary class="px-3 py-2.5 cursor-pointer text-xs font-medium text-slate-600 hover:bg-slate-50">Biaya Provider Midtrans (Lanjutan) ▾</summary>
+        <div class="px-3 pb-3 pt-2 border-t border-slate-100">
+            <p class="text-[11px] text-slate-400 mb-2">Total = Biaya Layanan + biaya ini. Kosongkan = 0.</p>
+            <div class="space-y-1.5">
+                <?php
+                $mtFeeRows = ['bca_va'=>'BCA VA','bni_va'=>'BNI VA','bri_va'=>'BRI VA','permata_va'=>'Permata','cimb_va'=>'CIMB','mandiri_bill'=>'Mandiri','gopay'=>'GoPay','shopeepay'=>'ShopeePay','qris'=>'QRIS(MT)'];
+                foreach ($mtFeeRows as $mm => $label): ?>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] text-slate-600 w-20 flex-shrink-0"><?= $label ?></span>
+                    <input type="number" step="1" min="0" name="mtfee_<?= $mm ?>_prov_flat" value="<?= e($s["mtfee_{$mm}_prov_flat"] ?? '') ?>" placeholder="Rp" class="flex-1 px-2 py-1 border border-slate-300 rounded text-[11px]">
+                    <input type="number" step="0.01" min="0" name="mtfee_<?= $mm ?>_prov_pct" value="<?= e($s["mtfee_{$mm}_prov_pct"] ?? '') ?>" placeholder="%" class="w-14 px-2 py-1 border border-slate-300 rounded text-[11px]">
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </details>
+
+    <!-- 5. Simulator -->
+    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <p class="text-xs font-semibold text-emerald-800 mb-2">Simulasi Cepat</p>
+        <div class="flex gap-2 mb-2">
+            <input type="number" id="feeSimAmount" value="100000" class="flex-1 px-3 py-2 border border-emerald-200 rounded-lg text-sm bg-white" placeholder="Nominal">
+            <button type="button" onclick="runFeeSim()" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold active:bg-emerald-700">Hitung</button>
+        </div>
+        <div id="feeSimResult" class="text-[11px] bg-white rounded border border-emerald-100 divide-y divide-emerald-50 hidden"></div>
     </div>
     <script>
-    function runFeeSim() {
-        var amount = parseInt(document.getElementById('feeSimAmount').value || '0', 10);
-        if (isNaN(amount) || amount < 0) amount = 0;
-        function num(name) { var el = document.querySelector('[name="' + name + '"]'); return el ? (parseFloat(el.value) || 0) : 0; }
-        function valEl(name) { var el = document.querySelector('[name="' + name + '"]'); return el ? el.value : ''; }
-        function rupiah(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
-        function feeByType(type, value, flat, amt) {
-            if (type === 'flat') return Math.round(value);
-            if (type === 'percentage') return Math.round(amt * value / 100);
-            if (type === 'hybrid') return Math.round(amt * value / 100) + flat;
-            return 0;
-        }
-        var defType = valEl('default_fee_type'), defVal = num('default_fee_value'), defFlat = num('default_fee_flat');
-        function channelFee(group, amt) {
-            var t = valEl('fee_' + group + '_type');
-            if (t === '') return feeByType(defType, defVal, defFlat, amt);
-            return feeByType(t, num('fee_' + group + '_value'), num('fee_' + group + '_flat'), amt);
-        }
-        var methods = {
-            'bca_va': ['VA BCA', 'va'], 'bni_va': ['VA BNI', 'va'], 'bri_va': ['VA BRI', 'va'],
-            'permata_va': ['VA Permata', 'va'], 'cimb_va': ['VA CIMB', 'va'], 'mandiri_bill': ['Mandiri Bill', 'va'],
-            'gopay': ['GoPay', 'ewallet'], 'shopeepay': ['ShopeePay', 'ewallet'], 'qris': ['QRIS (Midtrans)', 'qris']
-        };
-        var rows = '';
-        var aq = channelFee('qris', amount);
-        rows += '<div class="flex justify-between items-center px-3 py-2"><span class="text-slate-600">QRIS (AldiQRIS)</span><span class="font-semibold text-slate-800">' + rupiah(aq) + '</span></div>';
-        for (var m in methods) {
-            var group = methods[m][1];
-            var platform = channelFee(group, amount);
-            var provider = Math.round(amount * num('mtfee_' + m + '_prov_pct') / 100) + num('mtfee_' + m + '_prov_flat');
-            var total = platform + provider;
-            var detail = '<span class="text-xs text-slate-400">(Midtrans ' + rupiah(provider) + ' + Layanan ' + rupiah(platform) + ')</span>';
-            rows += '<div class="flex justify-between items-center px-3 py-2"><span class="text-slate-600">' + methods[m][0] + '</span><span><span class="font-semibold text-slate-800">' + rupiah(total) + '</span> ' + detail + '</span></div>';
-        }
-        var box = document.getElementById('feeSimResult');
-        box.innerHTML = rows;
-        box.classList.remove('hidden');
-    }
+    function runFeeSim(){var a=parseInt(document.getElementById('feeSimAmount').value||'0',10);if(isNaN(a)||a<0)a=0;function n(nm){var el=document.querySelector('[name="'+nm+'"]');return el?(parseFloat(el.value)||0):0;}function v(nm){var el=document.querySelector('[name="'+nm+'"]');return el?el.value:'';}function rp(x){return'Rp '+Math.round(x).toLocaleString('id-ID');}function calc(t,val,fl,amt){if(t==='flat')return Math.round(val);if(t==='percentage')return Math.round(amt*val/100);if(t==='hybrid')return Math.round(amt*val/100)+fl;return 0;}var dt=v('default_fee_type'),dv=n('default_fee_value'),df=n('default_fee_flat');function ch(g,amt){var t=v('fee_'+g+'_type');if(t==='')return calc(dt,dv,df,amt);return calc(t,n('fee_'+g+'_value'),n('fee_'+g+'_flat'),amt);}var r='<div class="flex justify-between px-2 py-1"><span>QRIS</span><b>'+rp(ch('qris',a))+'</b></div>';var ms={'bca_va':['BCA VA','va'],'bni_va':['BNI VA','va'],'bri_va':['BRI VA','va'],'gopay':['GoPay','ewallet'],'shopeepay':['ShopeePay','ewallet'],'qris':['QRIS(MT)','qris']};for(var m in ms){var g=ms[m][1],pf=ch(g,a),pv=Math.round(a*n('mtfee_'+m+'_prov_pct')/100)+n('mtfee_'+m+'_prov_flat');r+='<div class="flex justify-between px-2 py-1"><span>'+ms[m][0]+'</span><b>'+rp(pf+pv)+'</b></div>';}var b=document.getElementById('feeSimResult');b.innerHTML=r;b.classList.remove('hidden');}
     </script>
-    <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
+    <button type="submit" class="w-full py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium active:bg-slate-800">Simpan</button>
 </form>
 
 <?php elseif ($activeTab === 'withdrawal'): ?>
