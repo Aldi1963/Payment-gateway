@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/init.php';
 Auth::requireAdmin();
 
 require_once base_path('app/Controllers/AdminController.php');
+require_once base_path('app/Services/ConfigChangeService.php');
 $controller = new AdminController();
 $data = $controller->dashboard();
 $stats = $data['stats'];
@@ -10,10 +11,62 @@ $merchantCounts = $data['merchant_counts'];
 $recentTx = $data['recent_transactions'];
 $pendingWd = $data['pending_withdrawals'];
 
+// Pending config changes count
+$configService = new ConfigChangeService();
+$pendingConfigChanges = $configService->countPending();
+
 $pageTitle = 'Dashboard';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
+
+<!-- Action Required Alerts -->
+<?php if ($pendingConfigChanges > 0 || $merchantCounts['pending'] > 0 || !empty($pendingWd)): ?>
+<div class="space-y-2 mb-5">
+    <?php if ($pendingConfigChanges > 0): ?>
+    <a href="/admin/config-changes.php?status=pending" class="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl active:bg-amber-100 transition-colors">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-amber-200 rounded-lg flex items-center justify-center">
+                <svg class="w-4.5 h-4.5 text-amber-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-amber-900"><?= $pendingConfigChanges ?> perubahan konfigurasi menunggu approval</p>
+                <p class="text-[11px] text-amber-700">Webhook URL, Redirect URL — klik untuk review</p>
+            </div>
+        </div>
+        <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+    </a>
+    <?php endif; ?>
+    <?php if ($merchantCounts['pending'] > 0): ?>
+    <a href="/admin/merchants.php?status=pending" class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-xl active:bg-blue-100 transition-colors">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-blue-200 rounded-lg flex items-center justify-center">
+                <svg class="w-4.5 h-4.5 text-blue-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-blue-900"><?= $merchantCounts['pending'] ?> merchant menunggu aktivasi</p>
+                <p class="text-[11px] text-blue-700">Verifikasi dan approve merchant baru</p>
+            </div>
+        </div>
+        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+    </a>
+    <?php endif; ?>
+    <?php if (!empty($pendingWd)): ?>
+    <a href="/admin/withdrawals.php?status=PENDING" class="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-xl active:bg-purple-100 transition-colors">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-purple-200 rounded-lg flex items-center justify-center">
+                <svg class="w-4.5 h-4.5 text-purple-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-purple-900"><?= count($pendingWd) ?> withdrawal menunggu approval</p>
+                <p class="text-[11px] text-purple-700">Proses pencairan dana merchant</p>
+            </div>
+        </div>
+        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+    </a>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
