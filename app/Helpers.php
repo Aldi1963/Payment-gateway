@@ -85,6 +85,15 @@ function load_db_settings(): array
  */
 function setting(string $key, mixed $default = null): mixed
 {
+    // Test seam: when an isolated test explicitly populates the override map,
+    // matching keys are served from it. This has ZERO effect in production,
+    // where $GLOBALS['__TEST_SETTINGS_OVERRIDE'] is never set.
+    if (isset($GLOBALS['__TEST_SETTINGS_OVERRIDE'])
+        && is_array($GLOBALS['__TEST_SETTINGS_OVERRIDE'])
+        && array_key_exists($key, $GLOBALS['__TEST_SETTINGS_OVERRIDE'])) {
+        return $GLOBALS['__TEST_SETTINGS_OVERRIDE'][$key];
+    }
+
     static $settings = null;
     if ($settings === null) {
         $settings = load_db_settings();
