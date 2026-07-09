@@ -128,6 +128,94 @@ class FeeService
     }
 
     // =====================================================
+    // MIDTRANS PER-METHOD FEE (provider + platform)
+    // =====================================================
+
+    /**
+     * Internal Midtrans method codes that support a per-method combined fee.
+     */
+    public const MIDTRANS_FEE_METHODS = [
+        'bca_va', 'bni_va', 'bri_va', 'permata_va', 'cimb_va',
+        'mandiri_bill', 'gopay', 'shopeepay', 'qris',
+    ];
+
+    /**
+     * Calculate the combined fee for a Midtrans payment method:
+     *   total = biaya provider (Midtrans) + biaya layanan (kita)
+     * Each part supports a flat (Rp) and/or percentage (%) component.
+     *
+     * Example (VA): provider Rp4.000 + platform Rp500 = Rp4.500.
+     *
+     * Returns NULL when nothing is configured for the method so callers can
+     * fall back to the normal fee engine (backward compatible).
+     *
+     * @param int    $amount Transaction amount
+     * @param string $method Internal midtrans method code (bca_va, gopay, qris, ...)
+     * @return array|null ['fee'=>int, 'rule_id'=>null, 'fee_type'=>'midtrans_method', 'snapshot'=>array]
+     */
+    public function calculateMidtransMethodFee(int $amount, string $method): ?array
+    {
+        $method = strtolower(trim($method));
+        if ($method === '' || !in_array($method, self::MIDTRANS_FEE_METHODS, true)) {
+            return null;
+        }
+
+        $provFlat = (float) setting("mtfee_{$method}_prov_flat", 0);
+        $provPct  = (float) setting("mtfee_{$method}_prov_pct", 0);
+        $platFlat = (float) setting("mtfee_{$method}_plat_flat", 0);
+        $platPct  = (float) setting("mtfee_{$method}_plat_pct", 0);
+
+        // Not configured → let caller fall back to default/global fee
+        if ($provFlat <= 0 && $provPct <= 0 && $platFlat <= 0 && $platPct <= 0) {
+            return null;
+        }
+
+        $providerFee = (int) round($amount * $provPct / 100) + (int) round($provFlat);
+        $platformFee = (int) round($amount * $platPct / 100) + (int) round($platFlat);
+        $total = max(0, $providerFee + $platformFee);
+
+        return [
+            'fee' => $total,
+            'rule_id' => null,
+            'fee_type' => 'midtrans_method',
+            'snapshot' => [
+                'type' => 'midtrans_method',
+                'method' => $method,
+                'provider_fee' => $providerFee,
+                'platform_fee' => $platformFee,
+                'provider_flat' => (int) round($provFlat),
+                'provider_pct' => $provPct,
+                'platform_flat' => (int) round($platFlat),
+                'platform_pct' => $platPct,
+                'source' => 'midtrans_method_fee',
+                'calculated_at' => now(),
+            ],
+        ];
+    }
+
+    /**
+     * Map a public Midtrans method code (BCAVA, GOPAY, MTQRIS, ...) to the
+     * internal method key used for per-method fee settings
+     * (bca_va, gopay, qris, ...).
+     */
+    public static function mapMidtransPublicToInternal(?string $code): ?string
+    {
+        if (!$code) return null;
+        return match (strtoupper($code)) {
+            'BCAVA' => 'bca_va',
+            'BNIVA' => 'bni_va',
+            'BRIVA' => 'bri_va',
+            'PERMATAVA' => 'permata_va',
+            'CIMBVA' => 'cimb_va',
+            'MANDIRI' => 'mandiri_bill',
+            'GOPAY' => 'gopay',
+            'SHOPEEPAY' => 'shopeepay',
+            'MTQRIS' => 'qris',
+            default => strtolower(str_replace('midtrans_', '', $code)),
+        };
+    }
+
+    // =====================================================
     // RULE MATCHING ENGINE
     // =====================================================
 

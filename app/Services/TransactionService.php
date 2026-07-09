@@ -102,6 +102,17 @@ class TransactionService
 
         // Calculate fee using Fee Engine
         $feeResult = $this->feeService->calculateTransaction($amount, $merchantId);
+
+        // For Midtrans methods, use the combined per-method fee (provider + platform)
+        // when configured; otherwise keep the default fee above.
+        if ($channelCode === 'midtrans' && $paymentMethod) {
+            $mtInternal = FeeService::mapMidtransPublicToInternal($paymentMethod);
+            $mtFee = $mtInternal ? $this->feeService->calculateMidtransMethodFee($amount, $mtInternal) : null;
+            if ($mtFee !== null) {
+                $feeResult = $mtFee;
+            }
+        }
+
         $fee = $feeResult['fee'];
         $netAmount = $amount - $fee;
 
@@ -291,6 +302,23 @@ class TransactionService
             'api_response' => $apiResult['raw_response'] ?? json_encode($apiResult),
             'updated_at' => now(),
         ];
+
+        // Recompute fee for the chosen Midtrans method (provider + platform).
+        // Falls back silently to the existing fee when the method has no
+        // per-method fee configured.
+        if ($channelCode === 'midtrans' && $paymentMethod) {
+            $mtInternal = FeeService::mapMidtransPublicToInternal($paymentMethod);
+            $mtFee = $mtInternal
+                ? $this->feeService->calculateMidtransMethodFee((int)$transaction['amount'], $mtInternal)
+                : null;
+            if ($mtFee !== null) {
+                $updates['fee'] = $mtFee['fee'];
+                $updates['fee_type'] = $mtFee['fee_type'];
+                $updates['fee_rule_id'] = $mtFee['rule_id'];
+                $updates['fee_snapshot'] = $mtFee['snapshot'];
+                $updates['net_amount'] = (int)$transaction['amount'] - $mtFee['fee'];
+            }
+        }
 
         if ($apiResult['success']) {
             if ($channelCode === 'qris') {
