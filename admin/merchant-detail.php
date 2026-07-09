@@ -42,7 +42,7 @@ if (is_post()) {
 
 
     } elseif ($action === 'update_status') {
-        $newStatus = sanitize($_POST['status'] ?? '');
+        $newStatus = sanitize($_POST['new_status'] ?? '');
         if (in_array($newStatus, ['pending','active','suspended','rejected'])) {
             $merchantRepo->update($merchantId, ['status' => $newStatus, 'updated_at' => now()]);
             $auditService->log(Auth::id(), Auth::role(), $merchantId, 'merchant_status_changed', "Status changed to {$newStatus}", ['old' => $merchant['status'], 'new' => $newStatus]);
@@ -124,44 +124,65 @@ require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
 
 
-<a href="/admin/merchants.php" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg> Kembali
+<a href="/admin/merchants.php" class="inline-flex items-center gap-1 text-sm text-slate-500 active:text-slate-700 mb-4">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Kembali
 </a>
 
+<!-- Quick Approve Banner (only for pending merchants) -->
+<?php if ($merchant['status'] === 'pending'): ?>
+<div class="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <p class="text-sm font-semibold text-amber-900">Merchant menunggu approval</p>
+            <p class="text-xs text-amber-700 mt-0.5"><?= e($merchant['business_name']) ?> &mdash; <?= e($merchant['email']) ?></p>
+        </div>
+        <form method="POST" class="flex-shrink-0">
+            <?= csrf_field() ?>
+            <input type="hidden" name="_action" value="update_status">
+            <input type="hidden" name="_tab" value="info">
+            <input type="hidden" name="new_status" value="active">
+            <button type="submit" onclick="return confirm('Approve merchant ini?')" class="px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg active:bg-emerald-700">
+                Approve
+            </button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Summary Cards -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <p class="text-xs text-slate-500">Status</p>
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium mt-1 <?= status_badge_class($merchant['status']) ?>"><?= ucfirst($merchant['status']) ?></span>
+<div class="grid grid-cols-2 gap-3 mb-5">
+    <div class="bg-white rounded-xl border border-slate-200 p-3">
+        <p class="text-[11px] text-slate-500 uppercase tracking-wide">Status</p>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1.5 <?= status_badge_class($merchant['status']) ?>"><?= ucfirst($merchant['status']) ?></span>
     </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <p class="text-xs text-slate-500">Saldo Tersedia</p>
-        <p class="text-lg font-bold text-emerald-600 mt-1"><?= format_currency($wallet['available_balance'] ?? 0) ?></p>
+    <div class="bg-white rounded-xl border border-slate-200 p-3">
+        <p class="text-[11px] text-slate-500 uppercase tracking-wide">Saldo</p>
+        <p class="text-base font-bold text-emerald-600 mt-1"><?= format_currency($wallet['available_balance'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <p class="text-xs text-slate-500">Total Transaksi</p>
-        <p class="text-lg font-bold text-slate-800 mt-1"><?= number_format($stats['total_transactions']) ?></p>
+    <div class="bg-white rounded-xl border border-slate-200 p-3">
+        <p class="text-[11px] text-slate-500 uppercase tracking-wide">Transaksi</p>
+        <p class="text-base font-bold text-slate-800 mt-1"><?= number_format($stats['total_transactions']) ?></p>
     </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <p class="text-xs text-slate-500">Revenue (Paid)</p>
-        <p class="text-lg font-bold text-slate-800 mt-1"><?= format_currency($stats['total_revenue']) ?></p>
+    <div class="bg-white rounded-xl border border-slate-200 p-3">
+        <p class="text-[11px] text-slate-500 uppercase tracking-wide">Revenue</p>
+        <p class="text-base font-bold text-slate-800 mt-1"><?= format_currency($stats['total_revenue']) ?></p>
     </div>
 </div>
 
 <!-- Tab Navigation -->
-<div class="border-b border-slate-200 mb-6">
-    <nav class="flex gap-1 -mb-px overflow-x-auto">
-        <?php $tabs = ['info'=>'Info Bisnis','fee'=>'Fee & API','urls'=>'Webhook/URL','staff'=>'Staff','wallet'=>'Wallet'];
+<div class="border-b border-slate-200 mb-5 -mx-1">
+    <nav class="flex -mb-px overflow-x-auto scrollbar-hide px-1">
+        <?php $tabs = ['info'=>'Info','fee'=>'Fee & API','urls'=>'Webhook','staff'=>'Staff','wallet'=>'Wallet'];
         foreach ($tabs as $tk => $tl): ?>
-        <a href="?id=<?= e($merchantId) ?>&tab=<?= $tk ?>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 <?= $activeTab === $tk ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700' ?>">
+        <a href="?id=<?= e($merchantId) ?>&tab=<?= $tk ?>" class="px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors <?= $activeTab === $tk ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 active:text-slate-700' ?>">
             <?= $tl ?>
         </a>
         <?php endforeach; ?>
     </nav>
 </div>
 
-<div class="max-w-3xl">
-<div class="bg-white rounded-xl border border-slate-200 p-6">
+<div class="max-w-2xl">
+<div class="bg-white rounded-xl border border-slate-200 p-5">
 
 <?php if ($activeTab === 'info'): ?>
 <h3 class="text-lg font-semibold text-slate-800 mb-4">Informasi Bisnis</h3>
@@ -193,27 +214,39 @@ require_once __DIR__ . '/../includes/admin_layout.php';
         <div><label class="block text-sm font-medium text-slate-700 mb-1">Alamat</label>
             <input type="text" name="address" value="<?= e($merchant['address'] ?? '') ?>" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm"></div>
     </div>
-    <!-- Status change -->
-    <div class="border-t border-slate-200 pt-4 mt-4">
-        <div class="flex items-end gap-3">
-            <div class="flex-1">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Status Merchant</label>
-                <div class="flex gap-2">
-                    <?php foreach (['pending','active','suspended','rejected'] as $st): ?>
-                    <label class="flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border <?= $merchant['status'] === $st ? 'border-blue-300 bg-blue-50' : 'border-slate-200' ?>">
-                        <input type="radio" name="new_status" value="<?= $st ?>" <?= $merchant['status'] === $st ? 'checked' : '' ?> class="w-3.5 h-3.5">
-                        <span class="text-xs font-medium"><?= ucfirst($st) ?></span>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-    </div>
     <p class="text-xs text-slate-400">ID: <?= e($merchantId) ?> | Terdaftar: <?= format_date($merchant['created_at']) ?></p>
-    <div class="flex gap-3">
-        <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan Info</button>
-        <button type="submit" name="_action" value="update_status" formnovalidate class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200">Update Status</button>
+    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium active:bg-blue-700">Simpan Info</button>
+</form>
+
+<!-- Status Update — separate form to avoid conflict -->
+<form method="POST" class="mt-6 pt-5 border-t border-slate-200">
+    <?= csrf_field() ?>
+    <input type="hidden" name="_action" value="update_status">
+    <input type="hidden" name="_tab" value="info">
+    <label class="block text-sm font-semibold text-slate-800 mb-3">Ubah Status Merchant</label>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+        <?php
+        $statusColors = [
+            'pending' => 'border-amber-300 bg-amber-50 text-amber-800',
+            'active' => 'border-emerald-300 bg-emerald-50 text-emerald-800',
+            'suspended' => 'border-red-300 bg-red-50 text-red-800',
+            'rejected' => 'border-slate-300 bg-slate-50 text-slate-800',
+        ];
+        foreach (['pending','active','suspended','rejected'] as $st): ?>
+        <label class="flex items-center justify-center gap-2 cursor-pointer px-3 py-3 rounded-xl border-2 transition-all <?= $merchant['status'] === $st ? $statusColors[$st] . ' ring-2 ring-offset-1 ring-blue-400' : 'border-slate-200 hover:border-slate-300' ?>">
+            <input type="radio" name="new_status" value="<?= $st ?>" <?= $merchant['status'] === $st ? 'checked' : '' ?> class="sr-only peer">
+            <span class="text-xs font-semibold peer-checked:underline"><?= ucfirst($st) ?></span>
+        </label>
+        <?php endforeach; ?>
     </div>
+    <?php if ($merchant['status'] === 'pending'): ?>
+    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg mb-4">
+        <p class="text-xs text-emerald-800">Pilih <strong>Active</strong> lalu klik tombol di bawah untuk approve merchant ini.</p>
+    </div>
+    <?php endif; ?>
+    <button type="submit" onclick="return confirm('Ubah status merchant ke ' + document.querySelector('input[name=new_status]:checked').value + '?')" class="w-full sm:w-auto px-6 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium active:bg-slate-800">
+        Update Status
+    </button>
 </form>
 
 
