@@ -32,7 +32,7 @@ class MerchantRepository extends BaseRepository
      */
     public function findByApiKeySecure(string $apiKey): ?array
     {
-        $records = $this->query("SELECT * FROM `{$this->table}`");
+        $records = $this->query("SELECT * FROM `{$this->table}` WHERE `api_key` IS NOT NULL AND `api_key` != ''");
         $found = null;
 
         // Always iterate ALL records (constant-time relative to dataset size)

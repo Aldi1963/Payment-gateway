@@ -23,7 +23,17 @@ require_once dirname(__DIR__, 2) . '/includes/init.php';
 
 // Set CORS headers
 $allowedOrigins = setting('cors_allowed_origins', '*');
-header('Access-Control-Allow-Origin: ' . $allowedOrigins);
+if ($allowedOrigins === '*' || $allowedOrigins === '') {
+    header('Access-Control-Allow-Origin: *');
+} else {
+    // Specific allow-list configured: only reflect the origin if it matches.
+    $reqOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $allowList = array_map('trim', explode(',', $allowedOrigins));
+    if ($reqOrigin !== '' && in_array($reqOrigin, $allowList, true)) {
+        header('Access-Control-Allow-Origin: ' . $reqOrigin);
+        header('Vary: Origin');
+    }
+}
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, Idempotency-Key, X-Idempotency-Key');
 header('Access-Control-Expose-Headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-Idempotency-Replayed');

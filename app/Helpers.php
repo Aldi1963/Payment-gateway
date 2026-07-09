@@ -617,5 +617,13 @@ function public_payment_methods(): array
 function payment_logo(string $code): string
 {
     $safe = preg_replace('/[^a-z0-9]/', '', strtolower($code));
-    return '/assets/img/payments/' . $safe . '.svg';
+    $webDir = '/assets/img/payments/';
+    $baseFs = base_path('assets/img/payments/' . $safe);
+    // Prefer a real raster logo (png/jpg/webp) if present, else the bundled SVG.
+    foreach (['png', 'jpg', 'jpeg', 'webp', 'svg'] as $ext) {
+        if (is_file($baseFs . '.' . $ext)) {
+            return $webDir . $safe . '.' . $ext;
+        }
+    }
+    return $webDir . $safe . '.svg';
 }

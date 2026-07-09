@@ -15,7 +15,7 @@ class RateLimiter
     {
         $this->storageDir = dirname(__DIR__) . '/storage/rate_limits';
         if (!is_dir($this->storageDir)) {
-            mkdir($this->storageDir, 0755, true);
+            mkdir($this->storageDir, 0700, true);
         }
     }
 

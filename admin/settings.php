@@ -413,6 +413,52 @@ require_once __DIR__ . '/../includes/admin_layout.php';
         </div>
         <p class="text-xs text-slate-400 mt-2">Berlaku untuk metode via Midtrans. QRIS AldiQRIS (provider utama) tetap memakai Default Fee di atas.</p>
     </div>
+
+    <!-- Fee simulator (client-side, memakai nilai tabel di atas) -->
+    <div class="border-t border-slate-200 pt-4">
+        <p class="text-sm font-medium text-slate-700 mb-2">Simulasi Biaya</p>
+        <div class="flex flex-wrap items-end gap-2 mb-3">
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Nominal transaksi (Rp)</label>
+                <input type="number" id="feeSimAmount" value="100000" min="0" class="w-44 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            </div>
+            <button type="button" onclick="runFeeSim()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700">Hitung</button>
+        </div>
+        <div id="feeSimResult" class="text-sm border border-slate-200 rounded-lg divide-y divide-slate-100 hidden"></div>
+        <p class="text-xs text-slate-400 mt-2">Menghitung dari nilai pada tabel di atas (tidak perlu disimpan dulu).</p>
+    </div>
+    <script>
+    function runFeeSim() {
+        var amount = parseInt(document.getElementById('feeSimAmount').value || '0', 10);
+        if (isNaN(amount) || amount < 0) amount = 0;
+        var methods = {
+            'bca_va': 'VA BCA', 'bni_va': 'VA BNI', 'bri_va': 'VA BRI', 'permata_va': 'VA Permata',
+            'cimb_va': 'VA CIMB', 'mandiri_bill': 'Mandiri Bill', 'gopay': 'GoPay',
+            'shopeepay': 'ShopeePay', 'qris': 'QRIS (Midtrans)'
+        };
+        function num(name) { var el = document.querySelector('[name="' + name + '"]'); return el ? (parseFloat(el.value) || 0) : 0; }
+        function rupiah(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+        var rows = '';
+        for (var m in methods) {
+            var pf = num('mtfee_' + m + '_prov_flat'), pp = num('mtfee_' + m + '_prov_pct');
+            var of = num('mtfee_' + m + '_plat_flat'), op = num('mtfee_' + m + '_plat_pct');
+            var provider = Math.round(amount * pp / 100) + pf;
+            var platform = Math.round(amount * op / 100) + of;
+            var total = provider + platform;
+            var val;
+            if (pf <= 0 && pp <= 0 && of <= 0 && op <= 0) {
+                val = '<span class="text-slate-400">Default Fee</span>';
+            } else {
+                val = '<span class="font-semibold text-slate-800">' + rupiah(total) + '</span> ' +
+                      '<span class="text-xs text-slate-400">(Midtrans ' + rupiah(provider) + ' + Kita ' + rupiah(platform) + ')</span>';
+            }
+            rows += '<div class="flex justify-between items-center px-3 py-2"><span class="text-slate-600">' + methods[m] + '</span>' + val + '</div>';
+        }
+        var box = document.getElementById('feeSimResult');
+        box.innerHTML = rows;
+        box.classList.remove('hidden');
+    }
+    </script>
     <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Simpan</button>
 </form>
 

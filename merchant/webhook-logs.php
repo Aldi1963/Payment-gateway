@@ -49,7 +49,17 @@ if (is_post()) {
 
 // Get webhook events and retries for current merchant
 $webhookEvents = $webhookRepo->findByMerchant($merchantId);
-$webhookRetries = $retryRepo->findByMerchant($merchantId, 100);
+$allRetries = $retryRepo->findByMerchant($merchantId, 100);
+
+// Optional status filter
+$statusFilter = $_GET['status'] ?? '';
+if (!in_array($statusFilter, ['delivered', 'pending', 'failed'], true)) {
+    $statusFilter = '';
+}
+$webhookRetries = $statusFilter !== ''
+    ? array_values(array_filter($allRetries, fn($r) => ($r['status'] ?? '') === $statusFilter))
+    : $allRetries;
+$statusQuery = $statusFilter !== '' ? '&status=' . urlencode($statusFilter) : '';
 
 // Pagination (simple)
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -80,28 +90,33 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
 <!-- Stats Summary -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
     <?php
-    $totalDeliveries = count($webhookRetries);
-    $successCount = count(array_filter($webhookRetries, fn($r) => ($r['status'] ?? '') === 'delivered'));
-    $pendingCount = count(array_filter($webhookRetries, fn($r) => ($r['status'] ?? '') === 'pending'));
-    $failedCount = count(array_filter($webhookRetries, fn($r) => ($r['status'] ?? '') === 'failed'));
+    // Stats always reflect ALL deliveries (independent of active filter)
+    $totalDeliveries = count($allRetries);
+    $successCount = count(array_filter($allRetries, fn($r) => ($r['status'] ?? '') === 'delivered'));
+    $pendingCount = count(array_filter($allRetries, fn($r) => ($r['status'] ?? '') === 'pending'));
+    $failedCount = count(array_filter($allRetries, fn($r) => ($r['status'] ?? '') === 'failed'));
+    $cardBase = 'rounded-xl border p-4 block transition-colors hover:border-blue-300';
     ?>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
+    <a href="/merchant/webhook-logs.php" class="<?= $cardBase ?> bg-white <?= $statusFilter === '' ? 'border-blue-400 ring-1 ring-blue-200' : 'border-slate-200' ?>">
         <p class="text-xs text-slate-500">Total</p>
         <p class="text-2xl font-bold text-slate-800"><?= $totalDeliveries ?></p>
-    </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
+    </a>
+    <a href="?status=delivered" class="<?= $cardBase ?> bg-white <?= $statusFilter === 'delivered' ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-slate-200' ?>">
         <p class="text-xs text-slate-500">Berhasil</p>
         <p class="text-2xl font-bold text-emerald-600"><?= $successCount ?></p>
-    </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
+    </a>
+    <a href="?status=pending" class="<?= $cardBase ?> bg-white <?= $statusFilter === 'pending' ? 'border-amber-400 ring-1 ring-amber-200' : 'border-slate-200' ?>">
         <p class="text-xs text-slate-500">Pending</p>
         <p class="text-2xl font-bold text-amber-600"><?= $pendingCount ?></p>
-    </div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4">
+    </a>
+    <a href="?status=failed" class="<?= $cardBase ?> bg-white <?= $statusFilter === 'failed' ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200' ?>">
         <p class="text-xs text-slate-500">Gagal</p>
         <p class="text-2xl font-bold text-red-600"><?= $failedCount ?></p>
-    </div>
+    </a>
 </div>
+<?php if ($statusFilter !== ''): ?>
+<p class="text-xs text-slate-500 mb-3">Menampilkan status: <strong><?= e(ucfirst($statusFilter)) ?></strong> · <a href="/merchant/webhook-logs.php" class="text-blue-600 hover:underline">Tampilkan semua</a></p>
+<?php endif; ?>
 
 
 <!-- Webhook Deliveries Table -->
@@ -232,16 +247,16 @@ require_once __DIR__ . '/../includes/merchant_layout.php';
         </p>
         <div class="flex gap-1">
             <?php if ($page > 1): ?>
-            <a href="?page=<?= $page - 1 ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200">&laquo; Prev</a>
+            <a href="?page=<?= $page - 1 ?><?= $statusQuery ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200">&laquo; Prev</a>
             <?php endif; ?>
             <?php
             $startPage = max(1, $page - 2);
             $endPage = min($totalPages, $page + 2);
             for ($i = $startPage; $i <= $endPage; $i++): ?>
-            <a href="?page=<?= $i ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium <?= $i === $page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 border border-slate-200' ?>"><?= $i ?></a>
+            <a href="?page=<?= $i ?><?= $statusQuery ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium <?= $i === $page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 border border-slate-200' ?>"><?= $i ?></a>
             <?php endfor; ?>
             <?php if ($page < $totalPages): ?>
-            <a href="?page=<?= $page + 1 ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200">Next &raquo;</a>
+            <a href="?page=<?= $page + 1 ?><?= $statusQuery ?>" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200">Next &raquo;</a>
             <?php endif; ?>
         </div>
     </div>

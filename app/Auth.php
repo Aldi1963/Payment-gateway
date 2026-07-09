@@ -484,8 +484,10 @@ class Auth
      */
     private static function generateFingerprint(): string
     {
+        // Bind the session to the User-Agent only. Accept-Language was
+        // previously included but it can change (browser updates, extensions)
+        // and caused legitimate users to be logged out unexpectedly.
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $accept = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
-        return hash('sha256', $ua . '|' . $accept);
+        return hash('sha256', $ua);
     }
 }
