@@ -180,17 +180,16 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         // combined fee when configured, else the default/global fee).
         $feeSvc = new FeeService();
         $txAmount = (int)($transaction['amount'] ?? 0);
-        $defaultFeeResult = $feeSvc->calculateTransaction($txAmount, $transaction['merchant_id'] ?? '');
-        $defaultFeeLabel = 'Biaya ' . format_currency($defaultFeeResult['fee']);
-        $feeLabelFor = function (?string $publicCode) use ($feeSvc, $txAmount, $defaultFeeLabel) {
-            if ($publicCode && $publicCode !== 'QRIS-A') {
-                $internal = FeeService::mapMidtransPublicToInternal($publicCode);
-                $mf = $internal ? $feeSvc->calculateMidtransMethodFee($txAmount, $internal) : null;
-                if ($mf !== null) {
-                    return 'Biaya ' . format_currency($mf['fee']);
-                }
+        $txMerchantId = $transaction['merchant_id'] ?? '';
+        $feeLabelFor = function (?string $publicCode) use ($feeSvc, $txAmount, $txMerchantId) {
+            // QRIS-A = AldiQRIS QRIS channel; other codes = Midtrans methods
+            if ($publicCode === 'QRIS-A') {
+                $channel = 'qris'; $method = null;
+            } else {
+                $channel = 'midtrans'; $method = $publicCode;
             }
-            return $defaultFeeLabel;
+            $r = $feeSvc->calculateForContext($txAmount, $txMerchantId, $channel, $method);
+            return 'Biaya ' . format_currency($r['fee']);
         };
 
         // Group methods by category
