@@ -15,9 +15,14 @@ class FeeService
 {
     private FeeRuleRepository $ruleRepo;
 
-    public function __construct()
+    /**
+     * @param FeeRuleRepository|null $ruleRepo Optional repository. Defaults to a
+     *        real FeeRuleRepository (connects to the DB). Allowing injection keeps
+     *        the fee-calculation logic unit-testable without a live database.
+     */
+    public function __construct(?FeeRuleRepository $ruleRepo = null)
     {
-        $this->ruleRepo = new FeeRuleRepository();
+        $this->ruleRepo = $ruleRepo ?? new FeeRuleRepository();
     }
 
     // =====================================================
