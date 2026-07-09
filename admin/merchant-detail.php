@@ -118,15 +118,18 @@ $staffUsers = $userRepo->findByMerchant($merchantId);
 $stats = $txService->getMerchantStats($merchantId);
 $activeTab = $_GET['tab'] ?? 'info';
 
-$pageTitle = 'Detail Merchant: ' . e($merchant['business_name']);
+$pageTitle = 'Detail Merchant';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/admin_layout.php';
 ?>
 
 
-<a href="/admin/merchants.php" class="inline-flex items-center gap-1 text-sm text-slate-500 active:text-slate-700 mb-4">
+<a href="/admin/merchants.php" class="inline-flex items-center gap-1 text-sm text-slate-500 active:text-slate-700 mb-3">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Kembali
 </a>
+
+<!-- Merchant Name -->
+<h3 class="text-base font-bold text-slate-900 mb-4 truncate"><?= e($merchant['business_name']) ?></h3>
 
 <!-- Quick Approve Banner (only for pending merchants) -->
 <?php if ($merchant['status'] === 'pending'): ?>

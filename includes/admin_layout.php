@@ -76,16 +76,14 @@ if ($userRole === 'finance') {
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         <!-- Topbar -->
-        <header class="bg-white border-b border-slate-200 px-4 lg:px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <button onclick="toggleSidebar()" class="lg:hidden text-slate-600 hover:text-slate-900">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <header class="bg-white border-b border-slate-200 px-4 lg:px-6 py-2.5 flex items-center justify-between min-h-[48px]">
+            <div class="flex items-center gap-3 min-w-0">
+                <button onclick="toggleSidebar()" class="lg:hidden text-slate-600 active:text-slate-900 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <h2 class="text-lg font-semibold text-slate-800"><?= e($pageTitle ?? 'Dashboard') ?></h2>
+                <h2 class="text-sm font-semibold text-slate-800 truncate"><?= e($pageTitle ?? 'Dashboard') ?></h2>
             </div>
-            <div class="flex items-center gap-3">
-                <span class="text-sm text-slate-500"><?= date('d M Y, H:i') ?></span>
-            </div>
+            <span class="hidden sm:block text-xs text-slate-400 flex-shrink-0"><?= date('d M Y, H:i') ?></span>
         </header>
 
         <!-- Page Content -->
