@@ -100,18 +100,12 @@ class TransactionService
             return ['success' => false, 'message' => 'Format nomor WhatsApp tidak valid.'];
         }
 
-        // Calculate fee using Fee Engine
-        $feeResult = $this->feeService->calculateTransaction($amount, $merchantId);
-
-        // For Midtrans methods, use the combined per-method fee (provider + platform)
-        // when configured; otherwise keep the default fee above.
-        if ($channelCode === 'midtrans' && $paymentMethod) {
-            $mtInternal = FeeService::mapMidtransPublicToInternal($paymentMethod);
-            $mtFee = $mtInternal ? $this->feeService->calculateMidtransMethodFee($amount, $mtInternal) : null;
-            if ($mtFee !== null) {
-                $feeResult = $mtFee;
-            }
-        }
+        // Calculate fee. When the channel/method is known, use the per-channel
+        // platform fee (+ Midtrans provider fee); otherwise the default engine
+        // (recomputed later when the customer picks a method on pay.php).
+        $feeResult = $channelCode
+            ? $this->feeService->calculateForContext($amount, $merchantId, $channelCode, $paymentMethod)
+            : $this->feeService->calculateTransaction($amount, $merchantId);
 
         $fee = $feeResult['fee'];
         $netAmount = $amount - $fee;
@@ -303,21 +297,15 @@ class TransactionService
             'updated_at' => now(),
         ];
 
-        // Recompute fee for the chosen Midtrans method (provider + platform).
-        // Falls back silently to the existing fee when the method has no
-        // per-method fee configured.
-        if ($channelCode === 'midtrans' && $paymentMethod) {
-            $mtInternal = FeeService::mapMidtransPublicToInternal($paymentMethod);
-            $mtFee = $mtInternal
-                ? $this->feeService->calculateMidtransMethodFee((int)$transaction['amount'], $mtInternal)
-                : null;
-            if ($mtFee !== null) {
-                $updates['fee'] = $mtFee['fee'];
-                $updates['fee_type'] = $mtFee['fee_type'];
-                $updates['fee_rule_id'] = $mtFee['rule_id'];
-                $updates['fee_snapshot'] = $mtFee['snapshot'];
-                $updates['net_amount'] = (int)$transaction['amount'] - $mtFee['fee'];
-            }
+        // Recompute the fee now that the channel/method is known:
+        // per-channel platform fee (+ Midtrans provider fee for Midtrans methods).
+        if ($channelCode) {
+            $ctxFee = $this->feeService->calculateForContext((int)$transaction['amount'], $transaction['merchant_id'], $channelCode, $paymentMethod);
+            $updates['fee'] = $ctxFee['fee'];
+            $updates['fee_type'] = $ctxFee['fee_type'];
+            $updates['fee_rule_id'] = $ctxFee['rule_id'];
+            $updates['fee_snapshot'] = $ctxFee['snapshot'];
+            $updates['net_amount'] = (int)$transaction['amount'] - $ctxFee['fee'];
         }
 
         if ($apiResult['success']) {

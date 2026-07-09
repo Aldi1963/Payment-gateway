@@ -128,66 +128,138 @@ class FeeService
     }
 
     // =====================================================
-    // MIDTRANS PER-METHOD FEE (provider + platform)
+    // PER-CHANNEL FEE (biaya layanan per channel) + MIDTRANS PROVIDER FEE
     // =====================================================
+    //
+    // Total fee for a transaction =
+    //     biaya layanan per channel (QRIS / VA / E-Wallet)   [platform / "biaya admin"]
+    //   + biaya provider Midtrans per metode (khusus Midtrans)
+    //
+    // Example VA: provider Midtrans Rp4.000 + biaya channel VA Rp500 = Rp4.500.
 
     /**
-     * Internal Midtrans method codes that support a per-method combined fee.
+     * Internal Midtrans method codes that have a per-method provider fee.
      */
     public const MIDTRANS_FEE_METHODS = [
         'bca_va', 'bni_va', 'bri_va', 'permata_va', 'cimb_va',
         'mandiri_bill', 'gopay', 'shopeepay', 'qris',
     ];
 
+    /** Valid fee channel groups. */
+    public const FEE_CHANNEL_GROUPS = ['qris', 'va', 'ewallet'];
+
     /**
-     * Calculate the combined fee for a Midtrans payment method:
-     *   total = biaya provider (Midtrans) + biaya layanan (kita)
-     * Each part supports a flat (Rp) and/or percentage (%) component.
-     *
-     * Example (VA): provider Rp4.000 + platform Rp500 = Rp4.500.
-     *
-     * Returns NULL when nothing is configured for the method so callers can
-     * fall back to the normal fee engine (backward compatible).
-     *
-     * @param int    $amount Transaction amount
-     * @param string $method Internal midtrans method code (bca_va, gopay, qris, ...)
-     * @return array|null ['fee'=>int, 'rule_id'=>null, 'fee_type'=>'midtrans_method', 'snapshot'=>array]
+     * Determine the fee channel group for a transaction.
+     * @return string 'qris' | 'va' | 'ewallet' | '' (unknown)
      */
-    public function calculateMidtransMethodFee(int $amount, string $method): ?array
+    public static function channelGroupForMethod(?string $channelCode, ?string $publicMethod): string
     {
-        $method = strtolower(trim($method));
-        if ($method === '' || !in_array($method, self::MIDTRANS_FEE_METHODS, true)) {
-            return null;
+        $channelCode = strtolower((string) $channelCode);
+        if ($channelCode === 'qris') return 'qris';
+        if ($channelCode === 'va') return 'va';
+        if ($channelCode === 'ewallet') return 'ewallet';
+        if ($channelCode === 'midtrans') {
+            return match (self::mapMidtransPublicToInternal($publicMethod)) {
+                'bca_va', 'bni_va', 'bri_va', 'permata_va', 'cimb_va', 'mandiri_bill' => 'va',
+                'gopay', 'shopeepay' => 'ewallet',
+                'qris' => 'qris',
+                default => '',
+            };
+        }
+        return '';
+    }
+
+    /**
+     * Platform ("biaya admin") fee for a channel group (qris|va|ewallet).
+     * Uses per-channel settings fee_{group}_type/value/flat. When the channel
+     * fee is not configured, falls back to the default fee engine
+     * (merchant override / global rules / default settings) — backward compatible.
+     */
+    public function channelPlatformFee(int $amount, string $group, string $merchantId): array
+    {
+        $group = strtolower($group);
+        $type = in_array($group, self::FEE_CHANNEL_GROUPS, true) ? setting("fee_{$group}_type", '') : '';
+
+        if ($type === '') {
+            // Not configured for this channel → use the default fee engine
+            return $this->calculateTransaction($amount, $merchantId);
         }
 
-        $provFlat = (float) setting("mtfee_{$method}_prov_flat", 0);
-        $provPct  = (float) setting("mtfee_{$method}_prov_pct", 0);
-        $platFlat = (float) setting("mtfee_{$method}_plat_flat", 0);
-        $platPct  = (float) setting("mtfee_{$method}_plat_pct", 0);
+        $value = (float) setting("fee_{$group}_value", 0);
+        $flat  = (float) setting("fee_{$group}_flat", 0);
+        $fee = (int) match ($type) {
+            'flat' => max(0, round($value)),
+            'percentage' => max(0, round($amount * $value / 100)),
+            'hybrid' => max(0, round($amount * $value / 100) + $flat),
+            default => 0,
+        };
 
-        // Not configured → let caller fall back to default/global fee
-        if ($provFlat <= 0 && $provPct <= 0 && $platFlat <= 0 && $platPct <= 0) {
-            return null;
+        return [
+            'fee' => $fee,
+            'rule_id' => null,
+            'fee_type' => $type,
+            'snapshot' => [
+                'type' => $type,
+                'value' => $value,
+                'flat' => $flat,
+                'source' => "channel_fee_{$group}",
+            ],
+        ];
+    }
+
+    /**
+     * Midtrans provider fee (Midtrans cost) for a method. Flat + percentage.
+     * Returns 0 when not configured.
+     *
+     * @param string $internalMethod bca_va, gopay, qris, ...
+     */
+    public function midtransProviderFee(int $amount, string $internalMethod): int
+    {
+        $m = strtolower(trim($internalMethod));
+        if ($m === '' || !in_array($m, self::MIDTRANS_FEE_METHODS, true)) {
+            return 0;
+        }
+        $flat = (float) setting("mtfee_{$m}_prov_flat", 0);
+        $pct  = (float) setting("mtfee_{$m}_prov_pct", 0);
+        return max(0, (int) round($amount * $pct / 100) + (int) round($flat));
+    }
+
+    /**
+     * Calculate the total fee for a transaction given its channel/method:
+     *   total = per-channel platform fee + Midtrans provider fee (if Midtrans).
+     *
+     * When the channel/method is unknown (e.g. customer hasn't picked a method
+     * yet), falls back to the default fee engine.
+     *
+     * @param string|null $channelCode  'qris' | 'midtrans' | 'va' | 'ewallet' | null
+     * @param string|null $publicMethod public method code (BCAVA, GOPAY, MTQRIS, ...) or null
+     */
+    public function calculateForContext(int $amount, string $merchantId, ?string $channelCode, ?string $publicMethod): array
+    {
+        $group = self::channelGroupForMethod($channelCode, $publicMethod);
+        if ($group === '') {
+            return $this->calculateTransaction($amount, $merchantId);
         }
 
-        $providerFee = (int) round($amount * $provPct / 100) + (int) round($provFlat);
-        $platformFee = (int) round($amount * $platPct / 100) + (int) round($platFlat);
-        $total = max(0, $providerFee + $platformFee);
+        $platform = $this->channelPlatformFee($amount, $group, $merchantId);
+        $providerFee = (strtolower((string) $channelCode) === 'midtrans')
+            ? $this->midtransProviderFee($amount, self::mapMidtransPublicToInternal($publicMethod) ?? '')
+            : 0;
+        $total = max(0, (int) $platform['fee'] + $providerFee);
 
         return [
             'fee' => $total,
-            'rule_id' => null,
-            'fee_type' => 'midtrans_method',
+            'rule_id' => $platform['rule_id'] ?? null,
+            'fee_type' => 'channel_' . $group,
             'snapshot' => [
-                'type' => 'midtrans_method',
-                'method' => $method,
+                'type' => 'channel_' . $group,
+                'group' => $group,
+                'channel' => $channelCode,
+                'method' => $publicMethod,
+                'platform_fee' => (int) $platform['fee'],
+                'platform_detail' => $platform['snapshot'] ?? [],
                 'provider_fee' => $providerFee,
-                'platform_fee' => $platformFee,
-                'provider_flat' => (int) round($provFlat),
-                'provider_pct' => $provPct,
-                'platform_flat' => (int) round($platFlat),
-                'platform_pct' => $platPct,
-                'source' => 'midtrans_method_fee',
+                'source' => 'channel_fee',
                 'calculated_at' => now(),
             ],
         ];
