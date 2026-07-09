@@ -173,23 +173,40 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
 
         <?php
         // Get all enabled channels and methods
-        $channelManager = PaymentChannelManager::getInstance();
-        $enabledChannels = $channelManager->getEnabledChannels();
+        // Wrapped in try-catch: if any channel fails to construct (e.g. DB issue),
+        // we still show whatever channels we can.
+        $enabledChannels = [];
+        try {
+            $channelManager = PaymentChannelManager::getInstance();
+            $enabledChannels = $channelManager->getEnabledChannels();
+        } catch (\Throwable $e) {
+            app_log("PaymentChannelManager error: " . $e->getMessage(), 'ERROR');
+        }
 
-        // Fee label helper — shows the real fee per method (Midtrans per-method
-        // combined fee when configured, else the default/global fee).
-        $feeSvc = new FeeService();
+        // Fee label helper — shows the real fee per method
+        require_once base_path('app/Services/FeeService.php');
+        $feeSvc = null;
+        try {
+            $feeSvc = new FeeService();
+        } catch (\Throwable $e) {
+            app_log("FeeService construct error: " . $e->getMessage(), 'ERROR');
+        }
+
         $txAmount = (int)($transaction['amount'] ?? 0);
         $txMerchantId = $transaction['merchant_id'] ?? '';
         $feeLabelFor = function (?string $publicCode) use ($feeSvc, $txAmount, $txMerchantId) {
-            // QRIS-A = AldiQRIS QRIS channel; other codes = Midtrans methods
-            if ($publicCode === 'QRIS-A') {
-                $channel = 'qris'; $method = null;
-            } else {
-                $channel = 'midtrans'; $method = $publicCode;
+            if (!$feeSvc) return '';
+            try {
+                if ($publicCode === 'QRIS-A') {
+                    $channel = 'qris'; $method = null;
+                } else {
+                    $channel = 'midtrans'; $method = $publicCode;
+                }
+                $r = $feeSvc->calculateForContext($txAmount, $txMerchantId, $channel, $method);
+                return 'Biaya ' . format_currency($r['fee']);
+            } catch (\Throwable $e) {
+                return '';
             }
-            $r = $feeSvc->calculateForContext($txAmount, $txMerchantId, $channel, $method);
-            return 'Biaya ' . format_currency($r['fee']);
         };
 
         // Group methods by category
@@ -246,8 +263,11 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
         ?>
 
         <div class="space-y-5">
-        <?php foreach ($groups as $groupKey => $group):
+        <?php
+        $hasAnyMethod = false;
+        foreach ($groups as $groupKey => $group):
             if (empty($group['methods'])) continue;
+            $hasAnyMethod = true;
         ?>
             <!-- Group: <?= $group['label'] ?> -->
             <div>
@@ -263,7 +283,7 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-semibold text-slate-800 group-hover:text-blue-700"><?= e($pm['name']) ?></p>
-                            <p class="text-xs text-slate-400"><?= e($pm['fee']) ?> · <?= e($pm['desc']) ?></p>
+                            <p class="text-xs text-slate-400"><?= e($pm['fee']) ?><?= !empty($pm['fee']) && !empty($pm['desc']) ? ' · ' : '' ?><?= e($pm['desc']) ?></p>
                         </div>
                         <svg class="w-4 h-4 text-slate-300 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
@@ -271,6 +291,20 @@ $needsMethodSelection = $transaction && $transaction['status'] === 'PENDING' && 
                 </div>
             </div>
         <?php endforeach; ?>
+
+        <?php if (!$hasAnyMethod): ?>
+            <div class="text-center py-8">
+                <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                </div>
+                <p class="text-sm font-medium text-slate-700">Metode pembayaran belum tersedia</p>
+                <p class="text-xs text-slate-500 mt-1">Hubungi merchant untuk informasi lebih lanjut.</p>
+                <?php if (empty($enabledChannels)): ?>
+                <!-- Debug hint for admin (only visible in page source) -->
+                <!-- DEBUG: No enabled channels. Check: 1) channel_midtrans_enabled setting, 2) midtrans_server_key, 3) Database connection from pay.php -->
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         </div>
 
         <!-- Timer -->
